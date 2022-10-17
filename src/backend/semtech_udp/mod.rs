@@ -223,9 +223,9 @@ impl Backend {
     pub async fn setup(conf: &Configuration) -> Result<Self> {
         info!(
             "Binding UDP socket, bind: {}",
-            conf.backend.semtech_udp.udp_bind
+            conf.backend.semtech_udp.bind
         );
-        let socket = UdpSocket::bind(&conf.backend.semtech_udp.udp_bind).await?;
+        let socket = UdpSocket::bind(&conf.backend.semtech_udp.bind).await?;
 
         // setup state
         let state = State {

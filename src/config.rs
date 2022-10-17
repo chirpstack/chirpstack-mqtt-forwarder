@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::fs;
 
 use anyhow::Result;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default)]
 #[serde(default)]
 pub struct Configuration {
     pub logging: Logging,
@@ -24,7 +24,7 @@ impl Configuration {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(default)]
 pub struct Logging {
     pub level: String,
@@ -40,7 +40,7 @@ impl Default for Logging {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(default)]
 pub struct Mqtt {
     pub event_topic: String,
@@ -78,7 +78,7 @@ impl Default for Mqtt {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(default)]
 pub struct Backend {
     pub enabled: String,
@@ -96,21 +96,21 @@ impl Default for Backend {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(default)]
 pub struct SemtechUdp {
-    pub udp_bind: String,
+    pub bind: String,
 }
 
 impl Default for SemtechUdp {
     fn default() -> Self {
         SemtechUdp {
-            udp_bind: "0.0.0.0:1700".to_string(),
+            bind: "0.0.0.0:1700".to_string(),
         }
     }
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default)]
 #[serde(default)]
 pub struct Metadata {
     pub r#static: HashMap<String, String>,

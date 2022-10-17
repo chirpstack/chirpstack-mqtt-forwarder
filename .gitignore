@@ -2,7 +2,7 @@
 .*
 
 # Config files
-.*toml
+*.toml
 
 # Rust target directory
 /target

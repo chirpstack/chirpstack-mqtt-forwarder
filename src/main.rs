@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate anyhow;
 
+use std::process;
 use std::str::FromStr;
 
 use clap::{Parser, Subcommand};
@@ -8,6 +9,7 @@ use log::info;
 use signal_hook::{consts::SIGINT, consts::SIGTERM, iterator::Signals};
 
 mod backend;
+mod cmd;
 mod config;
 mod logging;
 mod metadata;
@@ -33,6 +35,12 @@ enum Commands {
 async fn main() {
     let cli = Cli::parse();
     let config = config::Configuration::get(&cli.config).expect("Read configuration error");
+
+    if let Some(Commands::Configfile {}) = &cli.command {
+        cmd::configfile::run(&config);
+        process::exit(0);
+    }
+
     let log_level = log::Level::from_str(&config.logging.level).expect("Parse log_level error");
     logging::setup(
         env!("CARGO_PKG_NAME"),
