@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs;
 
 use anyhow::Result;
@@ -9,6 +10,7 @@ pub struct Configuration {
     pub logging: Logging,
     pub mqtt: Mqtt,
     pub backend: Backend,
+    pub metadata: Metadata,
 }
 
 impl Configuration {
@@ -106,4 +108,11 @@ impl Default for SemtechUdp {
             udp_bind: "0.0.0.0:1700".to_string(),
         }
     }
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+pub struct Metadata {
+    pub r#static: HashMap<String, String>,
+    pub commands: HashMap<String, Vec<String>>,
 }

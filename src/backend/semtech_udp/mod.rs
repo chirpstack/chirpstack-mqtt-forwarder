@@ -14,6 +14,7 @@ use tokio::sync::{Mutex, RwLock};
 
 use super::Backend as BackendTrait;
 use crate::config::Configuration;
+use crate::metadata;
 use crate::mqtt::{send_gateway_stats, send_tx_ack, send_uplink_frame};
 
 mod structs;
@@ -352,6 +353,7 @@ async fn handle_push_data(state: &Arc<State>, data: &[u8], remote: &SocketAddr) 
         stats.rx_packets_per_modulation = s.rx_packets_per_modulation.clone();
         stats.tx_packets_per_modulation = s.tx_packets_per_modulation.clone();
         stats.tx_packets_per_status = s.tx_packets_per_status.clone();
+        stats.meta_data.extend(metadata::get().await?);
 
         send_gateway_stats(&stats).await?;
     }
@@ -479,7 +481,7 @@ mod tests {
     async fn test_udp_mqtt_end_to_end() {
         let mut buffer: [u8; 65535] = [0; 65535];
 
-        let c = Configuration {
+        let mut c = Configuration {
             backend: config::Backend {
                 gateway_id: "0102030405060708".into(),
                 ..Default::default()
@@ -491,6 +493,15 @@ mod tests {
             ..Default::default()
         };
 
+        c.metadata
+            .r#static
+            .insert("foo".to_string(), "bar".to_string());
+        c.metadata.commands.insert(
+            "hello".to_string(),
+            vec!["echo".to_string(), "hello world".to_string()],
+        );
+
+        crate::metadata::setup(&c).unwrap();
         crate::backend::setup(&c).await.unwrap();
         crate::mqtt::setup(&c).await.unwrap();
 
@@ -753,6 +764,17 @@ mod tests {
                     count: 1,
                 }],
                 tx_packets_per_status: [(gw::TxAckStatus::Ok.into(), 1),].iter().cloned().collect(),
+                meta_data: [
+                    (
+                        "mqtt_forwarder_version".to_string(),
+                        env!("CARGO_PKG_VERSION").to_string()
+                    ),
+                    ("foo".to_string(), "bar".to_string()),
+                    ("hello".to_string(), "hello world".to_string()),
+                ]
+                .iter()
+                .cloned()
+                .collect(),
                 ..Default::default()
             },
             pl
