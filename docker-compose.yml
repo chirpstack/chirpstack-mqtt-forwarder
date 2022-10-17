@@ -1,0 +1,15 @@
+services:
+  chirpstack-mqtt-forwarder:
+    image: chirpstack/chirpstack-mqtt-forwarder-dev-cache
+    volumes:
+      - ./:/chirpstack-mqtt-forwarder
+      - ./.rust/target:/chirpstack-mqtt-forwarder/target
+    ports:
+      - "1700:1700/udp"
+    depends_on:
+      - mosquitto
+
+  mosquitto:
+    image: eclipse-mosquitto:1.6
+    ports:
+      - "1883:1883"

@@ -1,0 +1,11 @@
+# Hidden files
+.*
+
+# Config files
+.*toml
+
+# Rust target directory
+/target
+
+# IPK packages
+*.ipk

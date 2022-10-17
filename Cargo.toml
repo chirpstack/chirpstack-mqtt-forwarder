@@ -1,0 +1,42 @@
+[package]
+name="chirpstack-mqtt-forwarder"
+description="ChirpStack MQTT Forwarder"
+repository="https://github.com/chirpstack/chirpstack-mqtt-forwarder"
+homepage="https://www.chirpstack.io/"
+license="MIT"
+version = "4.0.0"
+authors = ["Orne Brocaar <info@brocaar.com>"]
+edition = "2018"
+publish = false
+
+[dependencies]
+clap = { version = "4.0", default-features = false, features = ["std", "help", "usage", "derive"] }
+chirpstack_api = { version = "4.0.2", default-features = false }
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+simple_logger = "2.2"
+syslog = "6.0"
+prost = "0.11"
+anyhow = "1.0"
+toml = "0.5"
+once_cell = "1.15"
+chrono = "0.4"
+signal-hook = "0.3"
+hex = "0.4"
+regex = { version = "1.6", default-features = false }
+base64 = "0.13"
+rand = "0.8"
+pbjson-types = "0.5"
+paho-mqtt = { version = "0.11", features = ["vendored-ssl", "build_bindgen"] }
+handlebars = "4.3"
+tokio = { version = "1.21", features = ["macros", "rt-multi-thread", "net"] }
+futures = "0.3"
+async-trait = "0.1"
+
+[profile.release]
+strip = true
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
