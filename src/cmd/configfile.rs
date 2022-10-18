@@ -108,28 +108,42 @@ pub fn run(config: &Configuration) {
 # Gateway metadata configuration.
 [metadata]
 
-    # Static key / value metadata.
-    [metadata.static]
+  # Static key / value metadata.
+  [metadata.static]
       
-      # Example:
-      # serial_number="1234"
-      {{#each metadata.static}}
-      {{ @key }}="{{ this }}"
+    # Example:
+    # serial_number="1234"
+    {{#each metadata.static}}
+    {{ @key }}="{{ this }}"
+    {{/each}}
+
+
+  # Commands returning metadata.
+  [metadata.commands]
+
+    # Example:
+    # datetime=["date", "-R"]
+    {{#each metadata.commands}}
+    {{ @key }}=[
+      {{#each this}}
+      "{{ this }}",
       {{/each}}
+    ]
+    {{/each}}
 
 
-    # Commands returning metadata.
-    [metadata.commands]
+# Executable commands.
+[commands]
 
-      # Example:
-      # datetime=["date", "-R"]
-      {{#each metadata.commands}}
-      {{ @key }}=[
-        {{#each this}}
-        "{{ this }}",
-        {{/each}}
-      ]
-      {{/each}}
+  # Example:
+  # reboot=["/usr/bin/reboot"]
+  {{#each commands}}
+  {{ @key }}=[
+    {{#each this}}
+    "{{ this }}",
+    {{/this}}
+  ]
+  {{/each}}
 "#;
 
     let reg = Handlebars::new();

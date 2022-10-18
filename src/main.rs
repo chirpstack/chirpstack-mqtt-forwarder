@@ -10,6 +10,7 @@ use signal_hook::{consts::SIGINT, consts::SIGTERM, iterator::Signals};
 
 mod backend;
 mod cmd;
+mod commands;
 mod config;
 mod logging;
 mod metadata;
@@ -56,6 +57,7 @@ async fn main() {
         env!("CARGO_PKG_HOMEPAGE"),
     );
 
+    commands::setup(&config).expect("Setup commands error");
     metadata::setup(&config).expect("Setup metadata error");
     backend::setup(&config).await.expect("Setup backend error");
     mqtt::setup(&config).await.expect("Setup MQTT client error");

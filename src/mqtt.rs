@@ -10,11 +10,13 @@ use log::{debug, error, info, trace};
 use once_cell::sync::OnceCell;
 use paho_mqtt as mqtt;
 use prost::Message;
+use regex::Regex;
 use serde::Serialize;
 use tokio::sync::mpsc;
 use tokio::time::sleep;
 
 use crate::backend::{get_gateway_id, send_downlink_frame};
+use crate::commands;
 use crate::config::Configuration;
 
 static STATE: OnceCell<Arc<State>> = OnceCell::new();
@@ -22,6 +24,7 @@ static STATE: OnceCell<Arc<State>> = OnceCell::new();
 #[derive(Serialize)]
 struct CommandTopicContext {
     pub gateway_id: String,
+    pub command: String,
 }
 
 #[derive(Serialize)]
@@ -42,6 +45,7 @@ struct State<'a> {
     qos: usize,
     json: bool,
     gateway_id: String,
+    command_topic_regex: Regex,
 }
 
 pub async fn setup(conf: &Configuration) -> Result<()> {
@@ -59,9 +63,20 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
 
     // topic templates
     let mut templates = Handlebars::new();
+    templates.register_escape_fn(handlebars::no_escape);
     templates.register_template_string("command_topic", &conf.mqtt.command_topic)?;
     templates.register_template_string("state_topic", &conf.mqtt.state_topic)?;
     templates.register_template_string("event_topic", &conf.mqtt.event_topic)?;
+
+    // command regex
+    let command_topic_regex = Regex::new(&templates.render(
+        "command_topic",
+        &CommandTopicContext {
+            gateway_id: r"(?P<gateway_id>[a-fA-F0-9]{16})".into(),
+            command: r"(?P<command>\w+)".into(),
+        },
+    )?)
+    .unwrap();
 
     // Create connect channel
     // This is needed as we can't subscribe within the set_connected_callback as this would
@@ -159,6 +174,7 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
     let state = State {
         client,
         templates,
+        command_topic_regex,
         qos: conf.mqtt.qos,
         json: conf.mqtt.json,
         gateway_id: gateway_id.clone(),
@@ -172,6 +188,7 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
             "command_topic",
             &CommandTopicContext {
                 gateway_id: gateway_id.clone(),
+                command: "+".into(),
             },
         )?;
         let state_topic = state.templates.render(
@@ -311,13 +328,80 @@ async fn message_callback(msg: mqtt::Message) -> Result<()> {
     let b = msg.payload();
 
     info!("Received message, topic: {}, qos: {}", topic, qos);
-    if topic.ends_with("/down") {
-        let pl = match state.json {
-            true => serde_json::from_slice(b)?,
-            false => gw::DownlinkFrame::decode(&mut Cursor::new(b))?,
-        };
-        send_downlink_frame(&pl).await?;
+
+    let caps = state
+        .command_topic_regex
+        .captures(&topic)
+        .ok_or_else(|| anyhow!("Topic does not match topic template"))?;
+    let gateway_id = caps
+        .name("gateway_id")
+        .ok_or_else(|| anyhow!("Extract gateway_id from topic error"))?
+        .as_str();
+    let command = caps
+        .name("command")
+        .ok_or_else(|| anyhow!("Extract command from topic error"))?
+        .as_str();
+
+    match command {
+        "down" => {
+            let pl = match state.json {
+                true => serde_json::from_slice(b)?,
+                false => gw::DownlinkFrame::decode(&mut Cursor::new(b))?,
+            };
+            if pl.gateway_id != gateway_id {
+                return Err(anyhow!(
+                    "Gateway ID in payload does not match gateway ID in topic"
+                ));
+            }
+            send_downlink_frame(&pl).await
+        }
+        "exec" => {
+            let pl = match state.json {
+                true => serde_json::from_slice(b)?,
+                false => gw::GatewayCommandExecRequest::decode(&mut Cursor::new(b))?,
+            };
+            if pl.gateway_id != gateway_id {
+                return Err(anyhow!(
+                    "Gateway ID in payload does not match gateway ID in topic"
+                ));
+            }
+            handle_command_exec(&pl).await
+        }
+        _ => Err(anyhow!("Unexepcted command, command: {}", command)),
     }
+}
+
+async fn handle_command_exec(pl: &gw::GatewayCommandExecRequest) -> Result<()> {
+    let state = STATE.get().ok_or_else(|| anyhow!("STATE is not set"))?;
+
+    let resp = match commands::exec(pl).await {
+        Ok(v) => v,
+        Err(e) => gw::GatewayCommandExecResponse {
+            gateway_id: pl.gateway_id.clone(),
+            exec_id: pl.exec_id,
+            error: e.to_string(),
+            ..Default::default()
+        },
+    };
+
+    let b = match state.json {
+        true => serde_json::to_vec(&resp)?,
+        false => resp.encode_to_vec(),
+    };
+
+    let topic = state.templates.render(
+        "event_topic",
+        &EventTopicContext {
+            gateway_id: pl.gateway_id.clone(),
+            event: "exec".to_string(),
+        },
+    )?;
+
+    info!("Sending event, event: {}, topic: {}", "state", topic);
+    let msg = mqtt::Message::new(topic, b, state.qos as i32);
+    state.client.publish(msg).await?;
+
+    trace!("Message sent");
 
     Ok(())
 }

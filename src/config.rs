@@ -11,6 +11,7 @@ pub struct Configuration {
     pub mqtt: Mqtt,
     pub backend: Backend,
     pub metadata: Metadata,
+    pub commands: HashMap<String, Vec<String>>,
 }
 
 impl Configuration {
@@ -62,7 +63,7 @@ impl Default for Mqtt {
     fn default() -> Self {
         Mqtt {
             event_topic: "eu868/gateway/{{ gateway_id }}/event/{{ event }}".into(),
-            command_topic: "eu868/gateway/{{ gateway_id }}/command/+".into(),
+            command_topic: "eu868/gateway/{{ gateway_id }}/command/{{ command }}".into(),
             state_topic: "eu868/gateway/{{ gateway_id }}/state/{{ state }}".into(),
             json: false,
             server: "tcp://127.0.0.1:1883".into(),
