@@ -44,6 +44,9 @@ mkdir -p $PACKAGE_DIR/etc/init.d
 
 # Config file
 cat > $PACKAGE_DIR/etc/$PACKAGE_NAME/$PACKAGE_NAME.toml << EOF
+# See for a full configuration example:
+# https://www.chirpstack.io/docs/chirpstack-gateway-bridge/configuration.html
+
 [logging]
   level="info"
   log_to_syslog=true
@@ -55,7 +58,16 @@ cat > $PACKAGE_DIR/etc/$PACKAGE_NAME/$PACKAGE_NAME.toml << EOF
     udp_bind="0.0.0.0:1700"
 
 [mqtt]
+  event_topic="eu868/gateway/{{ gateway_id }}/event/{{ event }}"
+  command_topic="eu868/gateway/{{ gateway_id }}/command/+"
+  state_topic="eu868/gateway/{{ gateway_id }}/state/{{ state }}"
   server="tcp://127.0.0.1:1883"
+  json=false
+  username=""
+  password=""
+  ca_cert=""
+  tls_cert=""
+  tls_key=""
 EOF
 chmod 0644 $PACKAGE_DIR/etc/$PACKAGE_NAME/$PACKAGE_NAME.toml
 
