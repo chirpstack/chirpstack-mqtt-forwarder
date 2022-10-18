@@ -3,10 +3,12 @@ extern crate anyhow;
 
 use std::process;
 use std::str::FromStr;
+use std::time::Duration;
 
 use clap::{Parser, Subcommand};
 use log::info;
 use signal_hook::{consts::SIGINT, consts::SIGTERM, iterator::Signals};
+use tokio::time::sleep;
 
 mod backend;
 mod cmd;
@@ -43,12 +45,16 @@ async fn main() {
     }
 
     let log_level = log::Level::from_str(&config.logging.level).expect("Parse log_level error");
-    logging::setup(
+
+    // Loop until success, as this will fail when syslog hasn't been fully started.
+    while let Err(e) = logging::setup(
         env!("CARGO_PKG_NAME"),
         log_level,
         config.logging.log_to_syslog,
-    )
-    .expect("Setup logger error");
+    ) {
+        println!("Setup log error: {}", e);
+        sleep(Duration::from_secs(1)).await;
+    }
 
     info!(
         "Starting {} (version: {}, docs: {})",
