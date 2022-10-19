@@ -59,7 +59,7 @@ cat > $PACKAGE_DIR/etc/$PACKAGE_NAME/$PACKAGE_NAME.toml << EOF
 
 [mqtt]
   event_topic="eu868/gateway/{{ gateway_id }}/event/{{ event }}"
-  command_topic="eu868/gateway/{{ gateway_id }}/command/+"
+  command_topic="eu868/gateway/{{ gateway_id }}/command/{{ command }}"
   state_topic="eu868/gateway/{{ gateway_id }}/state/{{ state }}"
   server="tcp://127.0.0.1:1883"
   json=false
