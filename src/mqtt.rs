@@ -342,7 +342,7 @@ async fn message_callback(msg: mqtt::Message) -> Result<()> {
 
     let caps = state
         .command_topic_regex
-        .captures(&topic)
+        .captures(topic)
         .ok_or_else(|| anyhow!("Topic does not match topic template"))?;
     let gateway_id = caps
         .name("gateway_id")

@@ -416,7 +416,7 @@ async fn handle_tx_ack(state: &Arc<State>, data: &[u8], remote: &SocketAddr) -> 
 
     if ack_status == gw::TxAckStatus::Ok || downlink_cache.index >= ack_items.len() - 1 {
         let pl = gw::DownlinkTxAck {
-            gateway_id: hex::encode(&pl.gateway_id),
+            gateway_id: hex::encode(pl.gateway_id),
             downlink_id: downlink_cache.frame.downlink_id,
             items: ack_items,
             ..Default::default()
