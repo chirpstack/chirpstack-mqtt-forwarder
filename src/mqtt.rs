@@ -1,3 +1,4 @@
+use std::env;
 use std::io::Cursor;
 use std::sync::Arc;
 use std::time::Duration;
@@ -113,6 +114,7 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
     let create_opts = mqtt::CreateOptionsBuilder::new()
         .server_uri(&conf.mqtt.server)
         .client_id(&client_id)
+        .persistence(env::temp_dir())
         .finalize();
 
     let mut client = mqtt::AsyncClient::new(create_opts)?;

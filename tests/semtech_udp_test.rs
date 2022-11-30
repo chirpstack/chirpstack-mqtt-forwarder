@@ -42,6 +42,7 @@ async fn end_to_end() {
     // MQTT
     let create_opts = mqtt::CreateOptionsBuilder::new()
         .server_uri("tcp://mosquitto:1883")
+        .persistence(None)
         .finalize();
     let mut client = mqtt::AsyncClient::new(create_opts).unwrap();
     let mut stream = client.get_stream(25);
