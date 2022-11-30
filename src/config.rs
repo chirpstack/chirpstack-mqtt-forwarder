@@ -85,6 +85,7 @@ pub struct Backend {
     pub enabled: String,
     pub gateway_id: String,
     pub semtech_udp: SemtechUdp,
+    pub concentratord: Concentratord,
 }
 
 impl Default for Backend {
@@ -93,6 +94,23 @@ impl Default for Backend {
             enabled: "semtech_udp".to_string(),
             gateway_id: "".into(),
             semtech_udp: SemtechUdp::default(),
+            concentratord: Concentratord::default(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(default)]
+pub struct Concentratord {
+    pub event_url: String,
+    pub command_url: String,
+}
+
+impl Default for Concentratord {
+    fn default() -> Self {
+        Concentratord {
+            event_url: "ipc:///tmp/concentratord_event".into(),
+            command_url: "ipc:///tmp/concentratord_command".into(),
         }
     }
 }

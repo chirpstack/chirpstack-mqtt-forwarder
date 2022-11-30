@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::RwLock;
 
 use anyhow::Result;
 use log::error;
@@ -7,16 +8,18 @@ use tokio::process::Command;
 
 use crate::config::Configuration;
 
-static METADATA: OnceCell<HashMap<String, String>> = OnceCell::new();
-static COMMANDS: OnceCell<HashMap<String, Vec<String>>> = OnceCell::new();
+static METADATA: OnceCell<RwLock<HashMap<String, String>>> = OnceCell::new();
+static COMMANDS: OnceCell<RwLock<HashMap<String, Vec<String>>>> = OnceCell::new();
 
 pub fn setup(conf: &Configuration) -> Result<()> {
-    METADATA
-        .set(conf.metadata.r#static.clone())
-        .map_err(|_| anyhow!("OnceCell set error"))?;
-    COMMANDS
-        .set(conf.metadata.commands.clone())
-        .map_err(|_| anyhow!("OnceCell set error"))?;
+    let metadata = METADATA.get_or_init(|| RwLock::new(HashMap::new()));
+    let commands = COMMANDS.get_or_init(|| RwLock::new(HashMap::new()));
+
+    let mut metadata_w = metadata.write().unwrap();
+    let mut commands_w = commands.write().unwrap();
+    *metadata_w = conf.metadata.r#static.clone();
+    *commands_w = conf.metadata.commands.clone();
+
     Ok(())
 }
 
@@ -24,6 +27,8 @@ pub async fn get() -> Result<HashMap<String, String>> {
     let mut metadata = METADATA
         .get()
         .ok_or_else(|| anyhow!("METADATA is not set"))?
+        .read()
+        .unwrap()
         .clone();
 
     metadata.insert(
@@ -33,7 +38,10 @@ pub async fn get() -> Result<HashMap<String, String>> {
 
     let commands = COMMANDS
         .get()
-        .ok_or_else(|| anyhow!("COMMANDS is not set"))?;
+        .ok_or_else(|| anyhow!("COMMANDS is not set"))?
+        .read()
+        .unwrap()
+        .clone();
 
     for (k, v) in commands {
         if v.is_empty() {

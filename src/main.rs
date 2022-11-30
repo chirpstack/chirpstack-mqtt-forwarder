@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate anyhow;
-
 use std::process;
 use std::str::FromStr;
 use std::time::Duration;
@@ -10,13 +7,7 @@ use log::info;
 use signal_hook::{consts::SIGINT, consts::SIGTERM, iterator::Signals};
 use tokio::time::sleep;
 
-mod backend;
-mod cmd;
-mod commands;
-mod config;
-mod logging;
-mod metadata;
-mod mqtt;
+use chirpstack_mqtt_forwarder::{backend, cmd, commands, config, logging, metadata, mqtt};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]

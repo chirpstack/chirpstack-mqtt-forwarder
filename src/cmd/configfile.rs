@@ -16,7 +16,7 @@ pub fn run(config: &Configuration) {
   #   * WARN
   #   * ERROR
   #   * OFF
-  log_level="{{ logging.log_level }}"
+  level="{{ logging.level }}"
 
   # Log to syslog.
   #
@@ -141,7 +141,7 @@ pub fn run(config: &Configuration) {
   {{ @key }}=[
     {{#each this}}
     "{{ this }}",
-    {{/this}}
+    {{/each}}
   ]
   {{/each}}
 "#;

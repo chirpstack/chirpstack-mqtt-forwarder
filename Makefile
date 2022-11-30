@@ -23,13 +23,17 @@ devshell:
 dist:
 	docker-compose run --rm chirpstack-mqtt-forwarder make docker-package-dragino
 
-docker-release-mips:
+docker-release-mips-semtech-udp:
 	PATH=$$PATH:/opt/mips-linux-muslsf/bin \
 	BINDGEN_EXTRA_CLANG_ARGS="--sysroot=/opt/mips-linux-muslsf/mips-linux-muslsf" \
 	CC_mips_unknown_linux_musl=mips-linux-muslsf-gcc \
-		cargo build --target mips-unknown-linux-musl --release
+		cargo build --target mips-unknown-linux-musl --release --no-default-features --features semtech_udp
 
-docker-package-dragino: docker-release-mips
+docker-release-armv7hf:
+	BINDGEN_EXTRA_CLANG_ARGS="--sysroot=/usr/arm-linux-gnueabihf" \
+		cargo build --target armv7-unknown-linux-gnueabihf --release
+
+docker-package-dragino: docker-release-mips-semtech-udp
 	cd packaging/vendor/dragino/mips_24kc && ./package.sh
 
 build-dev-image:

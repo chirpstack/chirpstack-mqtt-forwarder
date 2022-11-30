@@ -49,6 +49,10 @@ struct State<'a> {
 }
 
 pub async fn setup(conf: &Configuration) -> Result<()> {
+    if STATE.get().is_some() {
+        return Ok(());
+    }
+
     debug!("Setting up MQTT client");
 
     // get gateway id
@@ -220,7 +224,7 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
                     error!("Subscribing to command topic error, error: {}", e);
                 }
 
-                info!("Sending state, state: {}, topic: {}", "conn", state_topic);
+                info!("Sending conn state, topic: {}", state_topic);
                 let msg = mqtt::Message::new_retained(&state_topic, b.clone(), state.qos as i32);
                 if let Err(e) = state.client.publish(msg).await {
                     error!("Sending state error: {}", e);
@@ -263,7 +267,11 @@ pub async fn send_uplink_frame(pl: &gw::UplinkFrame) -> Result<()> {
         },
     )?;
 
-    info!("Sending event, event: {}, topic: {}", "up", topic);
+    info!(
+        "Sending uplink event, uplink_id: {}, topic: {}",
+        pl.rx_info.as_ref().map(|v| v.uplink_id).unwrap_or_default(),
+        topic
+    );
     let msg = mqtt::Message::new(topic, b, state.qos as i32);
     state.client.publish(msg).await?;
 
@@ -287,7 +295,7 @@ pub async fn send_gateway_stats(pl: &gw::GatewayStats) -> Result<()> {
         },
     )?;
 
-    info!("Sending event, event: {}, topic: {}", "stats", topic);
+    info!("Sending gateway stats event, topic: {}", topic);
     let msg = mqtt::Message::new(topic, b, state.qos as i32);
     state.client.publish(msg).await?;
 
@@ -311,7 +319,10 @@ pub async fn send_tx_ack(pl: &gw::DownlinkTxAck) -> Result<()> {
         },
     )?;
 
-    info!("Sending event, event: {}, topic: {}", "ack", topic);
+    info!(
+        "Sending ack event, downlink_id: {}, topic: {}",
+        pl.downlink_id, topic
+    );
     let msg = mqtt::Message::new(topic, b, state.qos as i32);
     state.client.publish(msg).await?;
 
@@ -353,6 +364,10 @@ async fn message_callback(msg: mqtt::Message) -> Result<()> {
                     "Gateway ID in payload does not match gateway ID in topic"
                 ));
             }
+            info!(
+                "Received downlink command, downlink_id: {}, topic: {}",
+                pl.downlink_id, topic
+            );
             send_downlink_frame(&pl).await
         }
         "exec" => {
@@ -365,6 +380,10 @@ async fn message_callback(msg: mqtt::Message) -> Result<()> {
                     "Gateway ID in payload does not match gateway ID in topic"
                 ));
             }
+            info!(
+                "Received gateway command exec command, exec_id: {}, topic: {}",
+                pl.exec_id, topic
+            );
             handle_command_exec(&pl).await
         }
         _ => Err(anyhow!("Unexepcted command, command: {}", command)),
@@ -397,7 +416,10 @@ async fn handle_command_exec(pl: &gw::GatewayCommandExecRequest) -> Result<()> {
         },
     )?;
 
-    info!("Sending event, event: {}, topic: {}", "state", topic);
+    info!(
+        "Sending gateway command exec event, exec_id: {}, topic: {}",
+        pl.exec_id, topic
+    );
     let msg = mqtt::Message::new(topic, b, state.qos as i32);
     state.client.publish(msg).await?;
 

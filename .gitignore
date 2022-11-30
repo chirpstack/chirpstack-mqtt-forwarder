@@ -12,3 +12,4 @@
 
 # Exclude from gitignore
 !/.github
+!/.cargo

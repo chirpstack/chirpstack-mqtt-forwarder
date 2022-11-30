@@ -33,6 +33,12 @@ handlebars = "4.3"
 tokio = { version = "1.21", features = ["macros", "rt-multi-thread", "net", "process", "io-util"] }
 futures = "0.3"
 async-trait = "0.1"
+zmq = { version = "0.9", optional = true }
+
+[features]
+default = ["semtech_udp", "concentratord"]
+semtech_udp = []
+concentratord = ["zmq/vendored"]
 
 [profile.release]
 strip = true

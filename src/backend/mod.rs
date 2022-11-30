@@ -9,6 +9,9 @@ use once_cell::sync::OnceCell;
 
 use crate::config::Configuration;
 
+#[cfg(feature = "concentratord")]
+pub mod concentratord;
+#[cfg(feature = "semtech_udp")]
 pub mod semtech_udp;
 
 static BACKEND: OnceCell<Box<dyn Backend + Sync + Send>> = OnceCell::new();
@@ -21,9 +24,18 @@ pub trait Backend {
 
 pub async fn setup(conf: &Configuration) -> Result<()> {
     match conf.backend.enabled.as_ref() {
+        #[cfg(feature = "semtech_udp")]
         "semtech_udp" => {
             info!("Setting up Semtech UDP Packet Forwarder backend");
             let b = semtech_udp::Backend::setup(conf).await?;
+            BACKEND
+                .set(Box::new(b))
+                .map_err(|_| anyhow!("OnceCell set error"))?;
+        }
+        #[cfg(feature = "concentratord")]
+        "concentratord" => {
+            info!("Setting up ChirpStack Concentratord backend");
+            let b = concentratord::Backend::setup(conf).await?;
             BACKEND
                 .set(Box::new(b))
                 .map_err(|_| anyhow!("OnceCell set error"))?;
