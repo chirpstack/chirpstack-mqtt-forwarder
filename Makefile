@@ -33,6 +33,10 @@ docker-release-armv7hf:
 	BINDGEN_EXTRA_CLANG_ARGS="--sysroot=/usr/arm-linux-gnueabihf" \
 		cargo build --target armv7-unknown-linux-gnueabihf --release
 
+docker-release-armv5:
+	BINDGEN_EXTRA_CLANG_ARGS="--sysroot=/usr/arm-linux-gnueabi" \
+		cargo build --target armv5te-unknown-linux-gnueabi --release
+
 docker-package-dragino: docker-release-mips-semtech-udp
 	cd packaging/vendor/dragino/mips_24kc && ./package.sh
 

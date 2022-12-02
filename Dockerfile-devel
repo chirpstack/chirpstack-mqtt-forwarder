@@ -15,6 +15,8 @@ RUN apt-get update && \
 	bash \
 	protobuf-compiler \
 	jq \
+	gcc-arm-linux-gnueabi \
+	g++-arm-linux-gnueabi \
 	gcc-arm-linux-gnueabihf \
 	g++-arm-linux-gnueabihf \
 	gcc-aarch64-linux-gnu \
@@ -22,6 +24,7 @@ RUN apt-get update && \
 
 RUN rustup component add rustfmt clippy
 RUN rustup target add mips-unknown-linux-musl
+RUN rustup target add armv5te-unknown-linux-gnueabi
 RUN rustup target add armv7-unknown-linux-gnueabihf
 RUN rustup target add aarch64-unknown-linux-gnu
 

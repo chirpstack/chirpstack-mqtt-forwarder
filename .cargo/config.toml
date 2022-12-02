@@ -3,6 +3,12 @@ linker = "mips-linux-muslsf-cc"
 # https://github.com/rust-lang/rust/issues/80693
 rustflags = ["-C", "target-feature=+crt-static", "-C", "link-arg=-s", "-C", "link-arg=-lc", "-C", "link-arg=-lgcc"]
 
+[target.armv5te-unknown-linux-gnueabi]
+linker = "arm-linux-gnueabi-gcc"
+# Workaround for:
+# https://github.com/rust-lang/compiler-builtins/issues/420
+rustflags = ["-C", "link-arg=-Wl,--allow-multiple-definition"]
+
 [target.armv7-unknown-linux-gnueabihf]
 linker = "arm-linux-gnueabihf-gcc"
 
