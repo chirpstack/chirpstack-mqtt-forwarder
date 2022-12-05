@@ -1,6 +1,6 @@
 #!/bin/sh
 
-AP=ap1
+AP=ap2
 
 NAME="chirpstack-mqtt-forwarder"
 DESC="ChirpStack MQTT Forwarder"
