@@ -16,7 +16,7 @@ use serde::Serialize;
 use tokio::sync::mpsc;
 use tokio::time::sleep;
 
-use crate::backend::{get_gateway_id, send_downlink_frame};
+use crate::backend::{get_gateway_id, send_configuration_command, send_downlink_frame};
 use crate::commands;
 use crate::config::Configuration;
 
@@ -371,6 +371,22 @@ async fn message_callback(msg: mqtt::Message) -> Result<()> {
                 pl.downlink_id, topic
             );
             send_downlink_frame(&pl).await
+        }
+        "config" => {
+            let pl = match state.json {
+                true => serde_json::from_slice(b)?,
+                false => gw::GatewayConfiguration::decode(&mut Cursor::new(b))?,
+            };
+            if pl.gateway_id != gateway_id {
+                return Err(anyhow!(
+                    "Gateway ID in payload does not match gateway ID in topic"
+                ));
+            }
+            info!(
+                "Received configuration command, version: {}, topic: {}",
+                pl.version, topic
+            );
+            send_configuration_command(&pl).await
         }
         "exec" => {
             let pl = match state.json {

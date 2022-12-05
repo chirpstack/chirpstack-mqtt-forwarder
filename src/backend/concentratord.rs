@@ -111,6 +111,29 @@ impl BackendTrait for Backend {
 
         send_tx_ack(&tx_ack).await
     }
+
+    async fn send_configuration_command(&self, pl: &gw::GatewayConfiguration) -> Result<()> {
+        info!("Sending configuration command, version: {}", pl.version);
+
+        let cmd_sock = self.cmd_sock.lock().unwrap();
+        let b = pl.encode_to_vec();
+
+        // send 'config' command with payload
+        cmd_sock.send("config", zmq::SNDMORE)?;
+        cmd_sock.send(b, 0)?;
+
+        // set poller so that we can timeout after 100ms
+        let mut items = [cmd_sock.as_poll_item(zmq::POLLIN)];
+        zmq::poll(&mut items, 100)?;
+        if !items[0].is_readable() {
+            return Err(anyhow!("Could not read down response"));
+        }
+
+        // read response
+        let _: &[u8] = &cmd_sock.recv_bytes(0)?;
+
+        Ok(())
+    }
 }
 
 async fn event_loop(event_sock: zmq::Socket) {

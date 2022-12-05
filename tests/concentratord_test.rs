@@ -180,4 +180,38 @@ async fn end_to_end() {
     assert_eq!("eu868/gateway/0102030405060708/event/ack", mqtt_msg.topic());
     let pl = gw::DownlinkTxAck::decode(&mut Cursor::new(mqtt_msg.payload())).unwrap();
     assert_eq!(ack_pl, pl);
+
+    // Config
+    let config_pl = gw::GatewayConfiguration {
+        gateway_id: "0102030405060708".to_string(),
+        version: "123".to_string(),
+        ..Default::default()
+    };
+
+    let mqtt_msg = mqtt::Message::new(
+        "eu868/gateway/0102030405060708/command/config",
+        config_pl.encode_to_vec(),
+        0,
+    );
+    client.publish(mqtt_msg).await.unwrap();
+
+    // Use spawn_blocking as else will will block the tokio thread,
+    // which will also block the mqtt consume loop of the mqtt backend.
+    let msg = tokio::task::spawn_blocking({
+        let zmq_cmd = zmq_cmd.clone();
+
+        move || {
+            let zmq_cmd = zmq_cmd.lock().unwrap();
+            let msg = zmq_cmd.recv_multipart(0).unwrap();
+            zmq_cmd.send(vec![], 0).unwrap();
+
+            msg
+        }
+    })
+    .await
+    .unwrap();
+
+    let cmd = String::from_utf8(msg[0].clone()).unwrap();
+    assert_eq!("config", cmd);
+    assert_eq!(config_pl.encode_to_vec(), msg[1]);
 }

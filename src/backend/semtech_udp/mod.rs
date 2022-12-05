@@ -269,6 +269,10 @@ impl BackendTrait for Backend {
         }
         send_downlink_frame(&self.state, pl, acks, 0).await
     }
+
+    async fn send_configuration_command(&self, _pl: &gw::GatewayConfiguration) -> Result<()> {
+        Ok(())
+    }
 }
 
 async fn udp_receive_loop(state: Arc<State>) {
