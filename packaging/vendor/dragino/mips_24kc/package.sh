@@ -45,7 +45,7 @@ mkdir -p $PACKAGE_DIR/etc/init.d
 # Config file
 cat > $PACKAGE_DIR/etc/$PACKAGE_NAME/$PACKAGE_NAME.toml << EOF
 # See for a full configuration example:
-# https://www.chirpstack.io/docs/chirpstack-gateway-bridge/configuration.html
+# https://www.chirpstack.io/chirpstack-mqtt-forwarder/configuration.html
 
 [logging]
   level="info"
