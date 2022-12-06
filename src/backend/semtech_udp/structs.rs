@@ -357,6 +357,8 @@ pub struct RxPk {
     pub data: Vec<u8>,
     #[serde(default)]
     pub rsig: Vec<RSig>,
+    /// Custom meta-data (Optional, not part of PROTOCOL.TXT).
+    pub meta: Option<HashMap<String, String>>,
 }
 
 impl RxPk {
@@ -433,7 +435,7 @@ impl RxPk {
                 antenna: 0,
                 location: None,
                 context: self.tmst.to_be_bytes().to_vec(),
-                metadata: HashMap::new(),
+                metadata: self.meta.as_ref().cloned().unwrap_or_default(),
             }),
             ..Default::default()
         };
@@ -499,6 +501,8 @@ pub struct Stat {
     pub dwnb: u32,
     /// Number of packets emitted (unsigned integer).
     pub txnb: u32,
+    /// Custom meta-data (Optional, not part of PROTOCOL.TXT).
+    pub meta: Option<HashMap<String, String>>,
 }
 
 impl Stat {
@@ -523,6 +527,7 @@ impl Stat {
             rx_packets_received_ok: self.rxok,
             tx_packets_received: self.dwnb,
             tx_packets_emitted: self.txnb,
+            metadata: self.meta.as_ref().cloned().unwrap_or_default(),
             ..Default::default()
         };
 
@@ -912,6 +917,7 @@ mod test {
                     dwnb: 30,
                     txnb: 15,
                     ackr: 99.9,
+                    meta: None,
                 }),
                 rxpk: vec![],
             },
@@ -951,6 +957,7 @@ mod test {
                     dwnb: 30,
                     txnb: 15,
                     ackr: 99.9,
+                    meta: None,
                 }),
                 rxpk: vec![],
             },
@@ -973,6 +980,55 @@ mod test {
                 rx_packets_received_ok: 5,
                 tx_packets_received: 30,
                 tx_packets_emitted: 15,
+                ..Default::default()
+            }
+        );
+    }
+
+    #[test]
+    fn test_gateway_stats_meta() {
+        let now = Utc::now();
+        let stat = PushData {
+            random_token: 123,
+            gateway_id: [1, 2, 3, 4, 5, 6, 7, 8],
+            payload: PushDataPayload {
+                stat: Some(Stat {
+                    time: now,
+                    lati: 0.0,
+                    long: 0.0,
+                    alti: 0,
+                    rxnb: 10,
+                    rxok: 5,
+                    rxfw: 5,
+                    dwnb: 30,
+                    txnb: 15,
+                    ackr: 99.9,
+                    meta: Some(
+                        [("gateway_name".to_string(), "test-gateway".to_string())]
+                            .iter()
+                            .cloned()
+                            .collect(),
+                    ),
+                }),
+                rxpk: vec![],
+            },
+        };
+        let stat = stat.to_proto_gateway_stats().unwrap();
+        assert!(stat.is_some());
+        assert_eq!(
+            stat.unwrap(),
+            gw::GatewayStats {
+                gateway_id: "0102030405060708".to_string(),
+                time: Some(pbjson_types::Timestamp::from(now)),
+                location: None,
+                rx_packets_received: 10,
+                rx_packets_received_ok: 5,
+                tx_packets_received: 30,
+                tx_packets_emitted: 15,
+                metadata: [("gateway_name".to_string(), "test-gateway".to_string())]
+                    .iter()
+                    .cloned()
+                    .collect(),
                 ..Default::default()
             }
         );
@@ -1018,6 +1074,7 @@ mod test {
                     size: 4,
                     data: vec![4, 3, 2, 1],
                     rsig: vec![],
+                    meta: None,
                 }],
                 stat: None,
             },
@@ -1086,6 +1143,7 @@ mod test {
                     size: 4,
                     data: vec![4, 3, 2, 1],
                     rsig: vec![],
+                    meta: None,
                 }],
                 stat: None,
             },
@@ -1157,6 +1215,7 @@ mod test {
                     size: 4,
                     data: vec![4, 3, 2, 1],
                     rsig: vec![],
+                    meta: None,
                 }],
                 stat: None,
             },
@@ -1244,6 +1303,7 @@ mod test {
                             lsnr: Some(3.5),
                         },
                     ],
+                    meta: None,
                 }],
                 stat: None,
             },
@@ -1344,6 +1404,7 @@ mod test {
                     size: 4,
                     data: vec![4, 3, 2, 1],
                     rsig: vec![],
+                    meta: None,
                 }],
                 stat: None,
             },
@@ -1407,6 +1468,7 @@ mod test {
                     size: 4,
                     data: vec![4, 3, 2, 1],
                     rsig: vec![],
+                    meta: None,
                 }],
                 stat: None,
             },
@@ -1438,6 +1500,84 @@ mod test {
                     rf_chain: 1,
                     board: 3,
                     context: vec![0, 0, 4, 210],
+                    ..Default::default()
+                }),
+
+                ..Default::default()
+            },
+            pl[0]
+        );
+    }
+
+    #[test]
+    fn test_uplink_frame_lora_with_meta() {
+        let now = Utc::now();
+
+        let pl = PushData {
+            random_token: 123,
+            gateway_id: [1, 2, 3, 4, 5, 6, 7, 8],
+            payload: PushDataPayload {
+                rxpk: vec![RxPk {
+                    time: Some(now),
+                    tmms: None,
+                    tmst: 1234,
+                    ftime: None,
+                    freq: 868.1,
+                    chan: 5,
+                    rfch: 1,
+                    brd: 3,
+                    stat: CRC::OK,
+                    modu: Modulation::Lora,
+                    datr: DataRate::Lora(7, 125000),
+                    codr: Some(CodeRate::Cr45),
+                    rssi: 120,
+                    lsnr: Some(3.5),
+                    hpw: None,
+                    size: 4,
+                    data: vec![4, 3, 2, 1],
+                    rsig: vec![],
+                    meta: Some(
+                        [("gateway_name".to_string(), "test-gateway".to_string())]
+                            .iter()
+                            .cloned()
+                            .collect(),
+                    ),
+                }],
+                stat: None,
+            },
+        };
+        let pl = pl.to_proto_uplink_frames().unwrap();
+        assert_eq!(1, pl.len());
+        assert_eq!(
+            gw::UplinkFrame {
+                phy_payload: vec![4, 3, 2, 1],
+                tx_info: Some(gw::UplinkTxInfo {
+                    frequency: 868100000,
+                    modulation: Some(gw::Modulation {
+                        parameters: Some(gw::modulation::Parameters::Lora(
+                            gw::LoraModulationInfo {
+                                bandwidth: 125000,
+                                spreading_factor: 7,
+                                code_rate: gw::CodeRate::Cr45.into(),
+                                ..Default::default()
+                            }
+                        )),
+                    }),
+                }),
+                rx_info: Some(gw::UplinkRxInfo {
+                    gateway_id: "0102030405060708".into(),
+                    uplink_id: 123,
+                    time: Some(pbjson_types::Timestamp::from(now)),
+                    rssi: 120,
+                    snr: 3.5,
+                    channel: 5,
+                    rf_chain: 1,
+                    board: 3,
+                    context: vec![0, 0, 4, 210],
+                    metadata: [("gateway_name".to_string(), "test-gateway".to_string())]
+                        .iter()
+                        .cloned()
+                        .collect(),
                     ..Default::default()
                 }),
 
