@@ -105,6 +105,16 @@ pub fn run(config: &Configuration) {
     bind="{{ backend.semtech_udp.bind }}"
 
 
+  # ChirpStack Concentratord backend configuration.
+  [backend.concentratord]
+
+    # Event API URL.
+    event_url="{{ backend.concentratord.event_url }}"
+
+    # Command API URL.
+    command_url="{{ backend.concentratord.command_url }}"
+
+
 # Gateway metadata configuration.
 [metadata]
 
