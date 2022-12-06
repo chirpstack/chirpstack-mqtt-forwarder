@@ -359,7 +359,7 @@ async fn handle_push_data(state: &Arc<State>, data: &[u8], remote: &SocketAddr) 
         stats.rx_packets_per_modulation = s.rx_packets_per_modulation.clone();
         stats.tx_packets_per_modulation = s.tx_packets_per_modulation.clone();
         stats.tx_packets_per_status = s.tx_packets_per_status.clone();
-        stats.meta_data.extend(metadata::get().await?);
+        stats.metadata.extend(metadata::get().await?);
 
         send_gateway_stats(&stats).await?;
     }

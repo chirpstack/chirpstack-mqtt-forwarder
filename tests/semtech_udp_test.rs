@@ -295,7 +295,7 @@ async fn end_to_end() {
                 count: 1,
             }],
             tx_packets_per_status: [(gw::TxAckStatus::Ok.into(), 1),].iter().cloned().collect(),
-            meta_data: [
+            metadata: [
                 (
                     "mqtt_forwarder_version".to_string(),
                     env!("CARGO_PKG_VERSION").to_string()

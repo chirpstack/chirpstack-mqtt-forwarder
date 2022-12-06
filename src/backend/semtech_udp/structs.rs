@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::convert::TryInto;
 use std::time::Duration;
 
@@ -432,7 +433,7 @@ impl RxPk {
                 antenna: 0,
                 location: None,
                 context: self.tmst.to_be_bytes().to_vec(),
-                metadata: None,
+                metadata: HashMap::new(),
             }),
             ..Default::default()
         };
