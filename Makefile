@@ -65,7 +65,7 @@ docker-package-multitech-conduit: docker-release-armv5
 docker-package-targz-armv7hf: docker-release-armv7hf
 	$(eval PKG_VERSION := $(shell cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version'))
 	mkdir -p dist
-	tar -czvf dist/chirpstack-mqtt-forwarder_$(PKG_VERSION)_arm7hf.tar.gz -C target/armv7-unknown-linux-gnueabihf/release chirpstack-mqtt-forwarder
+	tar -czvf dist/chirpstack-mqtt-forwarder_$(PKG_VERSION)_armv7hf.tar.gz -C target/armv7-unknown-linux-gnueabihf/release chirpstack-mqtt-forwarder
 
 docker-package-targz-arm64: docker-release-arm64
 	$(eval PKG_VERSION := $(shell cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version'))
