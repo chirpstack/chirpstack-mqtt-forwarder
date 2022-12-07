@@ -55,7 +55,7 @@ jobs:
       -
         name: Upload binaries to S3
         run: |
-          aws s3 sync --include "*.ipk" packaging/vendor s3://builds.loraserver.io/chirpstack-mqtt-forwarder
+          aws s3 sync dist s3://builds.loraserver.io/chirpstack-mqtt-forwarder
         if: startsWith(github.ref, 'refs/tags/v')
       -
         name: Make cache accessible to caching action
