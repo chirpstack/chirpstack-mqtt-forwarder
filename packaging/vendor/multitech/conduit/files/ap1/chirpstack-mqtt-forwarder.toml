@@ -1,0 +1,22 @@
+[logging]
+  level="info"
+  log_to_syslog=true
+
+[backend]
+  enabled="concentratord" 
+
+  [backend.concentratord]
+    event_url="ipc:///tmp/concentratord_event_ap1" 
+	command_url="ipc:///tmp/concentratord_command_ap1"
+
+[mqtt]
+  event_topic="eu868/gateway/{{ gateway_id }}/event/{{ event }}"
+  command_topic="eu868/gateway/{{ gateway_id }}/command/{{ command }}"
+  state_topic="eu868/gateway/{{ gateway_id }}/state/{{ state }}"
+  server="tcp://localhost:1883"
+  json=false
+  username=""
+  password=""
+  ca_cert=""
+  tls_cert=""
+  tls_key=""

@@ -1,0 +1,21 @@
+#!/bin/sh /etc/rc.common
+
+START=100
+STOP=100
+
+start() {
+    echo "Starting $PACKAGE_NAME"
+	start-stop-daemon \
+		-S \
+		-b \
+		-m \
+		-p /var/run/$PACKAGE_NAME.pid \
+		-x /usr/bin/$PACKAGE_NAME -- --config /etc/$PACKAGE_NAME/$PACKAGE_NAME.toml
+}
+
+stop() {
+    echo "Stopping $PACKAGE_NAME"
+    start-stop-daemon \
+		-K \
+		-p /var/run/$PACKAGE_NAME.pid
+}

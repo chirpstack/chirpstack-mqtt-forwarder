@@ -1,13 +1,13 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -e
 
-PACKAGE_NAME="chirpstack-mqtt-forwarder"
-PACKAGE_VERSION=$1
 REV="r1"
 
-
-BIN_PATH="../../../../target/armv5te-unknown-linux-gnueabi/release/chirpstack-mqtt-forwarder"
+PACKAGE_NAME=`cargo metadata --no-deps --format-version 1 | jq -r ".packages[0].name"`
+PACKAGE_VERSION=`cargo metadata --no-deps --format-version 1| jq -r ".packages[0].version"`
+PACKAGE_DESCRIPTION=`cargo metadata --no-deps --format-version 1| jq -r ".packages[0].description"`
+BIN_PATH="../../../../target/armv5te-unknown-linux-gnueabi/release/${PACKAGE_NAME}"
 DIR=`dirname $0`
 PACKAGE_DIR="${DIR}/package"
 
@@ -24,7 +24,7 @@ Maintainer: Orne Brocaar <info@brocaar.com>
 Priority: optional
 Section: network
 Source: N/A
-Description: ChirpStack MQTT Forwarder
+Description: $PACKAGE_DESCRIPTION
 EOF
 
 cat > $PACKAGE_DIR/CONTROL/postinst << EOF
