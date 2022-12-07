@@ -9,6 +9,7 @@
 
 # IPK packages
 *.ipk
+/dist
 
 # Exclude from gitignore
 !/.github
