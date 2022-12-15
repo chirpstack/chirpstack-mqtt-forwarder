@@ -30,6 +30,7 @@ dist:
 		docker-package-targz-arm64 \
 		docker-package-dragino \
 		docker-package-multitech-conduit \
+		docker-package-multitech-conduit-ap \
 		docker-package-tektelic-kona \
 		docker-package-kerlink-klkgw
 
@@ -67,6 +68,11 @@ docker-package-multitech-conduit: docker-release-armv5
 	cd packaging/vendor/multitech/conduit && ./package.sh
 	mkdir -p dist/vendor/multitech/conduit
 	cp packaging/vendor/multitech/conduit/*.ipk dist/vendor/multitech/conduit
+
+docker-package-multitech-conduit-ap: docker-release-armv5
+	cd packaging/vendor/multitech/conduit_ap && ./package.sh
+	mkdir -p dist/vendor/multitech/conduit_ap
+	cp packaging/vendor/multitech/conduit_ap/*.ipk dist/vendor/multitech/conduit_ap
 
 docker-package-tektelic-kona: docker-release-armv7hf
 	cd packaging/vendor/tektelic/kona && ./package.sh

@@ -1,0 +1,21 @@
+[logging]
+  level="info"
+  log_to_syslog=true
+
+[backend]
+  enabled="semtech_udp" 
+
+  [backend.semtech_udp]
+    udp_bind="0.0.0.0:1700"
+
+[mqtt]
+  event_topic="eu868/gateway/{{ gateway_id }}/event/{{ event }}"
+  command_topic="eu868/gateway/{{ gateway_id }}/command/{{ command }}"
+  state_topic="eu868/gateway/{{ gateway_id }}/state/{{ state }}"
+  server="tcp://127.0.0.1:1883"
+  json=false
+  username=""
+  password=""
+  ca_cert=""
+  tls_cert=""
+  tls_key=""
