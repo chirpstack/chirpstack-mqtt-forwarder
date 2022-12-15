@@ -30,7 +30,8 @@ dist:
 		docker-package-targz-arm64 \
 		docker-package-dragino \
 		docker-package-multitech-conduit \
-		docker-package-tektelic-kona
+		docker-package-tektelic-kona \
+		docker-package-kerlink-klkgw
 
 build-dev-image:
 	docker build -t chirpstack/chirpstack-mqtt-forwarder-dev-cache -f Dockerfile-devel .
@@ -71,6 +72,11 @@ docker-package-tektelic-kona: docker-release-armv7hf
 	cd packaging/vendor/tektelic/kona && ./package.sh
 	mkdir -p dist/vendor/tektelic/kona
 	cp packaging/vendor/tektelic/kona/*.ipk dist/vendor/tektelic/kona
+
+docker-package-kerlink-klkgw: docker-release-armv7hf
+	cd packaging/vendor/kerlink/klkgw && ./package.sh
+	mkdir -p dist/vendor/kerlink/klkgw
+	cp packaging/vendor/kerlink/klkgw/*.ipk dist/vendor/kerlink/klkgw
 
 docker-package-targz-armv7hf: docker-release-armv7hf
 	$(eval PKG_VERSION := $(shell cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version'))
