@@ -2,7 +2,7 @@
 
 set -e
 
-REV="r3"
+REV="r1"
 
 PACKAGE_NAME=`cargo metadata --no-deps --format-version 1 | jq -r ".packages[0].name"`
 PACKAGE_VERSION=`cargo metadata --no-deps --format-version 1| jq -r ".packages[0].version"`
