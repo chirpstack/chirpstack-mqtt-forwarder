@@ -10,6 +10,10 @@ version:
 	git commit -v -m "Bump version to $(VERSION)"
 	git tag -a v$(VERSION) -m "v$(VERSION)"
 
+# Cleanup dist.
+clean:
+	rm -rf dist
+
 # Run tests
 test:
 	docker-compose run --rm chirpstack-mqtt-forwarder cargo clippy --no-deps
@@ -25,7 +29,8 @@ dist:
 		docker-package-targz-armv7hf \
 		docker-package-targz-arm64 \
 		docker-package-dragino \
-		docker-package-multitech-conduit
+		docker-package-multitech-conduit \
+		docker-package-tektelic-kona
 
 build-dev-image:
 	docker build -t chirpstack/chirpstack-mqtt-forwarder-dev-cache -f Dockerfile-devel .
@@ -61,6 +66,11 @@ docker-package-multitech-conduit: docker-release-armv5
 	cd packaging/vendor/multitech/conduit && ./package.sh
 	mkdir -p dist/vendor/multitech/conduit
 	cp packaging/vendor/multitech/conduit/*.ipk dist/vendor/multitech/conduit
+
+docker-package-tektelic-kona: docker-release-armv7hf
+	cd packaging/vendor/tektelic/kona && ./package.sh
+	mkdir -p dist/vendor/tektelic/kona
+	cp packaging/vendor/tektelic/kona/*.ipk dist/vendor/tektelic/kona
 
 docker-package-targz-armv7hf: docker-release-armv7hf
 	$(eval PKG_VERSION := $(shell cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version'))

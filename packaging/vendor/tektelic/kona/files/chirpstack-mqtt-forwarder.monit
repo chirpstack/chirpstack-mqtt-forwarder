@@ -1,0 +1,4 @@
+check process chirpstack-mqtt-forwarder pidfile /var/run/chirpstack-mqtt-forwarder.pid
+	start program = "/bin/bash -c '/etc/init.d/chirpstack-mqtt-forwarder start'"
+	stop program = "/bin/bash -c '/etc/init.d/chirpstack-mqtt-forwarder stop'"
+
