@@ -319,6 +319,7 @@ pub struct PushDataPayload {
 #[derive(Deserialize, PartialEq, Debug)]
 pub struct RxPk {
     /// UTC time of pkt RX, us precision, ISO 8601 'compact' format
+    #[serde(default)]
     #[serde(with = "compact_time_format")]
     pub time: Option<DateTime<Utc>>,
     /// GPS time of pkt RX, number of milliseconds since 06.Jan.1980
