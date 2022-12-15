@@ -331,8 +331,10 @@ pub struct RxPk {
     /// RX central frequency in MHz (unsigned float, Hz precision)
     pub freq: f64,
     /// Concentrator "IF" channel used for RX (unsigned integer)
+    #[serde(default)]
     pub chan: u32,
     /// Concentrator "RF chain" used for RX (unsigned integer)
+    #[serde(default)]
     pub rfch: u32,
     /// Concentrator board used for RX (unsigned integer).
     #[serde(default)]
@@ -346,6 +348,7 @@ pub struct RxPk {
     /// Lora coding rate.
     pub codr: Option<CodeRate>,
     /// RSSI in dBm (signed integer, 1 dB precision).
+    #[serde(default)]
     pub rssi: i32,
     /// Lora SNR ratio in dB (signed float, 0.1 dB precision).
     pub lsnr: Option<f32>,
