@@ -90,7 +90,22 @@ pub fn run(config: &Configuration) {
 [backend]
 
   # Enabled backend.
+  #
+  # Set this to the backend that must be used by the ChirpStack MQTT Forwarder.
+  # Valid options are:
+  #   * concentratord
+  #   * semtech_udp
   enabled="{{ backend.enabled }}"
+
+
+  # ChirpStack Concentratord backend configuration.
+  [backend.concentratord]
+
+    # Event API URL.
+    event_url="{{ backend.concentratord.event_url }}"
+
+    # Command API URL.
+    command_url="{{ backend.concentratord.command_url }}"
 
 
   # Semtech UDP backend configuration.
@@ -103,16 +118,6 @@ pub fn run(config: &Configuration) {
     # so make sure the 'serv_port_up' and 'serv_port_down' from your
     # packet-forwarder matches this port.
     bind="{{ backend.semtech_udp.bind }}"
-
-
-  # ChirpStack Concentratord backend configuration.
-  [backend.concentratord]
-
-    # Event API URL.
-    event_url="{{ backend.concentratord.event_url }}"
-
-    # Command API URL.
-    command_url="{{ backend.concentratord.command_url }}"
 
 
 # Gateway metadata configuration.

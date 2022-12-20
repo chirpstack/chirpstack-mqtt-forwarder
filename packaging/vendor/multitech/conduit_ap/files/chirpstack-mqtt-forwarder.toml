@@ -1,19 +1,31 @@
+# For a complete configuration example and documentation, please refer to:
+# https://www.chirpstack.io/chirpstack-mqtt-forwarder/configuration.html
+
 [logging]
   level="info"
   log_to_syslog=true
 
 [backend]
+  # Enabled backend.
+  #
+  # Set this to the backend that must be used by the ChirpStack MQTT Forwarder.
+  # Valid options are:
+  #   * concentratord
+  #   * semtech_udp
   enabled="semtech_udp" 
 
+  [backend.concentratord]
+    event_url="ipc:///tmp/concentratord_event" 
+	command_url="ipc:///tmp/concentratord_command"
+
   [backend.semtech_udp]
-    udp_bind="0.0.0.0:1700"
+    bind="0.0.0.0:1700"
 
 [mqtt]
   event_topic="eu868/gateway/{{ gateway_id }}/event/{{ event }}"
   command_topic="eu868/gateway/{{ gateway_id }}/command/{{ command }}"
   state_topic="eu868/gateway/{{ gateway_id }}/state/{{ state }}"
   server="tcp://127.0.0.1:1883"
-  json=false
   username=""
   password=""
   ca_cert=""
