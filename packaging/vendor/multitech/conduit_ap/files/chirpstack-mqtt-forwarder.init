@@ -3,7 +3,7 @@
 NAME="chirpstack-mqtt-forwarder"
 DESC="ChirpStack MQTT Forwarder"
 DAEMON_BIN=/usr/bin/$NAME
-DAEMON_CONF=/etc/$NAME/$NAME.toml
+DAEMON_CONF=/var/config/$NAME/$NAME.toml
 DAEMON_PID=/var/run/$NAME.pid
 
 function do_start {
