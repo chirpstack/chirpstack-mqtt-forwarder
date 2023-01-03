@@ -44,9 +44,7 @@ impl Default for Logging {
 #[derive(Serialize, Deserialize)]
 #[serde(default)]
 pub struct Mqtt {
-    pub event_topic: String,
-    pub command_topic: String,
-    pub state_topic: String,
+    pub topic_prefix: String,
     pub json: bool,
     pub server: String,
     pub username: String,
@@ -62,9 +60,7 @@ pub struct Mqtt {
 impl Default for Mqtt {
     fn default() -> Self {
         Mqtt {
-            event_topic: "eu868/gateway/{{ gateway_id }}/event/{{ event }}".into(),
-            command_topic: "eu868/gateway/{{ gateway_id }}/command/{{ command }}".into(),
-            state_topic: "eu868/gateway/{{ gateway_id }}/state/{{ state }}".into(),
+            topic_prefix: "eu868".into(),
             json: false,
             server: "tcp://127.0.0.1:1883".into(),
             username: "".into(),

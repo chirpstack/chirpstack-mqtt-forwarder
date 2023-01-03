@@ -27,16 +27,25 @@ pub fn run(config: &Configuration) {
 # MQTT settings.
 [mqtt]
 
-  # Event topic template.
-  event_topic="{{ mqtt.event_topic }}"
-
-  # State topic template.
-  state_topic="{{ mqtt.state_topic }}"
-
-  # Command topic template.
-  command_topic="{{ mqtt.command_topic }}"
+  # Topic prefix.
+  #
+  # ChirpStack MQTT Forwarder publishes to the following topics:
+  #
+  #  * [Prefix/]gateway/[Gateway ID]/event/[Event]
+  #  * [Prefix/]gateway/[Gateway ID]/state/[State]
+  #
+  # And subscribes to the following topic:
+  #
+  #  * [Prefix/]gateway/[Gateway ID]/command/[Command]
+  #
+  # The topic prefix can be used to define the region of the gateway.
+  # Note, there is no need to add a trailing '/' to the prefix. The trailing
+  # '/' is automatically added to the prefix if it is configured.
+  topic_prefix="{{ mqtt.topic_prefix }}"
 
   # Use JSON encoding instead of Protobuf (binary).
+  #
+  # Note, only use this for debugging purposes.
   json={{ mqtt.json }}
 
   # MQTT server (e.g. scheme://host:port where scheme is tcp, ssl or ws)

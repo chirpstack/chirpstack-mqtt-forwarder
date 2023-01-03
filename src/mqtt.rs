@@ -67,11 +67,35 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
     };
 
     // topic templates
+    let command_topic = "gateway/{{ gateway_id }}/command/{{ command }}".to_string();
+    let state_topic = "gateway/{{ gateway_id }}/state/{{ state }}".to_string();
+    let event_topic = "gateway/{{ gateway_id }}/event/{{ event }}".to_string();
     let mut templates = Handlebars::new();
     templates.register_escape_fn(handlebars::no_escape);
-    templates.register_template_string("command_topic", &conf.mqtt.command_topic)?;
-    templates.register_template_string("state_topic", &conf.mqtt.state_topic)?;
-    templates.register_template_string("event_topic", &conf.mqtt.event_topic)?;
+    templates.register_template_string(
+        "command_topic",
+        if conf.mqtt.topic_prefix.is_empty() {
+            command_topic
+        } else {
+            format!("{}/{}", conf.mqtt.topic_prefix, command_topic)
+        },
+    )?;
+    templates.register_template_string(
+        "state_topic",
+        if conf.mqtt.topic_prefix.is_empty() {
+            state_topic
+        } else {
+            format!("{}/{}", conf.mqtt.topic_prefix, state_topic)
+        },
+    )?;
+    templates.register_template_string(
+        "event_topic",
+        if conf.mqtt.topic_prefix.is_empty() {
+            event_topic
+        } else {
+            format!("{}/{}", conf.mqtt.topic_prefix, event_topic)
+        },
+    )?;
 
     // command regex
     let command_topic_regex = Regex::new(&templates.render(
