@@ -863,13 +863,14 @@ mod expanded_time_format {
 }
 
 mod base64_bytes {
+    use base64::{engine::general_purpose, Engine as _};
     use serde::{Deserializer, Serializer};
 
     pub fn serialize<S>(b: &[u8], serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        let s = base64::encode(b);
+        let s = general_purpose::STANDARD.encode(b);
         serializer.serialize_str(&s)
     }
 
@@ -878,7 +879,9 @@ mod base64_bytes {
         D: Deserializer<'a>,
     {
         let s: &str = serde::de::Deserialize::deserialize(deserializer)?;
-        base64::decode(s).map_err(serde::de::Error::custom)
+        general_purpose::STANDARD
+            .decode(s)
+            .map_err(serde::de::Error::custom)
     }
 }
 
