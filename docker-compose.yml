@@ -4,6 +4,9 @@ services:
     volumes:
       - ./:/chirpstack-mqtt-forwarder
       - ./.rust/target:/chirpstack-mqtt-forwarder/target
+      - ./.rust/.cargo/registry/index:/usr/local/cargo/registry/index
+      - ./.rust/.cargo/registry/cache:/usr/local/cargo/registry/cache
+      - ./.rust/.cargo/git/db:/usr/local/cargo/git/db
     ports:
       - "1700:1700/udp"
     depends_on:
