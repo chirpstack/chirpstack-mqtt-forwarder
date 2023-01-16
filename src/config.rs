@@ -79,6 +79,9 @@ impl Default for Mqtt {
 #[serde(default)]
 pub struct Backend {
     pub enabled: String,
+    pub forward_crc_ok: bool,
+    pub forward_crc_invalid: bool,
+    pub forward_crc_missing: bool,
     pub gateway_id: String,
     pub semtech_udp: SemtechUdp,
     pub concentratord: Concentratord,
@@ -88,6 +91,9 @@ impl Default for Backend {
     fn default() -> Self {
         Backend {
             enabled: "semtech_udp".to_string(),
+            forward_crc_ok: true,
+            forward_crc_invalid: false,
+            forward_crc_missing: false,
             gateway_id: "".into(),
             semtech_udp: SemtechUdp::default(),
             concentratord: Concentratord::default(),

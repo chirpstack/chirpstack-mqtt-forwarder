@@ -106,6 +106,15 @@ pub fn run(config: &Configuration) {
   #   * semtech_udp
   enabled="{{ backend.enabled }}"
 
+  # Forward CRC ok.
+  forward_crc_ok={{ backend.forward_crc_ok }}
+
+  # Forward CRC invalid.
+  forward_crc_invalid={{ backend.forward_crc_invalid }}
+
+  # Forward CRC missing.
+  forward_crc_missing={{ backend.forward_crc_missing }}
+
 
   # ChirpStack Concentratord backend configuration.
   [backend.concentratord]

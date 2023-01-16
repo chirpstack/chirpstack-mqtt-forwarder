@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use anyhow::Result;
 use async_trait::async_trait;
 use chirpstack_api::gw;
-use log::{error, info, trace};
+use log::{debug, error, info, trace};
 use prost::Message;
 use tokio::task;
 
@@ -56,8 +56,18 @@ impl Backend {
         info!("Received gateway id, gateway_id: {}", gateway_id);
 
         tokio::spawn({
+            let forward_crc_ok = conf.backend.forward_crc_ok;
+            let forward_crc_invalid = conf.backend.forward_crc_invalid;
+            let forward_crc_missing = conf.backend.forward_crc_missing;
+
             async move {
-                event_loop(event_sock).await;
+                event_loop(
+                    event_sock,
+                    forward_crc_ok,
+                    forward_crc_invalid,
+                    forward_crc_missing,
+                )
+                .await;
             }
         });
 
@@ -136,7 +146,12 @@ impl BackendTrait for Backend {
     }
 }
 
-async fn event_loop(event_sock: zmq::Socket) {
+async fn event_loop(
+    event_sock: zmq::Socket,
+    forward_crc_ok: bool,
+    forward_crc_invalid: bool,
+    forward_crc_missing: bool,
+) {
     trace!("Starting event loop");
     let event_sock = Arc::new(Mutex::new(event_sock));
 
@@ -169,7 +184,15 @@ async fn event_loop(event_sock: zmq::Socket) {
                     continue;
                 }
 
-                if let Err(err) = handle_event_msg(&msg[0], &msg[1]).await {
+                if let Err(err) = handle_event_msg(
+                    &msg[0],
+                    &msg[1],
+                    forward_crc_ok,
+                    forward_crc_invalid,
+                    forward_crc_missing,
+                )
+                .await
+                {
                     error!("Handle event error: {}", err);
                     continue;
                 }
@@ -186,13 +209,32 @@ async fn event_loop(event_sock: zmq::Socket) {
     }
 }
 
-async fn handle_event_msg(event: &[u8], pl: &[u8]) -> Result<()> {
+async fn handle_event_msg(
+    event: &[u8],
+    pl: &[u8],
+    forward_crc_ok: bool,
+    forward_crc_invalid: bool,
+    forward_crc_missing: bool,
+) -> Result<()> {
     let event = String::from_utf8(event.to_vec())?;
     let pl = Cursor::new(pl.to_vec());
 
     match event.as_str() {
         "up" => {
             let pl = gw::UplinkFrame::decode(pl)?;
+            if let Some(rx_info) = &pl.rx_info {
+                if !((rx_info.crc_status() == gw::CrcStatus::CrcOk && forward_crc_ok)
+                    || (rx_info.crc_status() == gw::CrcStatus::BadCrc && forward_crc_invalid)
+                    || (rx_info.crc_status() == gw::CrcStatus::NoCrc && forward_crc_missing))
+                {
+                    debug!(
+                        "Ignoring uplink frame because of forward_crc_ flags, uplink_id: {}",
+                        pl.rx_info.as_ref().map(|v| v.uplink_id).unwrap_or_default(),
+                    );
+                    return Ok(());
+                }
+            }
+
             info!(
                 "Received uplink frame, uplink_id: {}",
                 pl.rx_info.as_ref().map(|v| v.uplink_id).unwrap_or_default(),

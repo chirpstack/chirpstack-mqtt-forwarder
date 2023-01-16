@@ -154,6 +154,7 @@ async fn end_to_end() {
                 channel: 2,
                 rf_chain: 0,
                 context: vec![0, 0, 4, 210],
+                crc_status: gw::CrcStatus::CrcOk.into(),
                 ..Default::default()
             }),
             ..Default::default()

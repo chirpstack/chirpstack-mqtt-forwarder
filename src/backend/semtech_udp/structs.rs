@@ -14,35 +14,35 @@ use serde_json::Value;
 const PROTOCOL_VERSION: u8 = 0x02;
 
 #[derive(PartialEq, Eq, Debug)]
-pub enum CRC {
-    OK,
-    Fail,
-    NoCrc,
+pub enum Crc {
+    Ok,
+    Invalid,
+    Missing,
 }
 
-impl<'de> Deserialize<'de> for CRC {
+impl<'de> Deserialize<'de> for Crc {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
         let crc = i32::deserialize(deserializer)?;
         match crc {
-            1 => Ok(CRC::OK),
-            -1 => Ok(CRC::Fail),
-            _ => Ok(CRC::NoCrc),
+            1 => Ok(Crc::Ok),
+            -1 => Ok(Crc::Invalid),
+            _ => Ok(Crc::Missing),
         }
     }
 }
 
-impl Serialize for CRC {
+impl Serialize for Crc {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         match self {
-            CRC::OK => serializer.serialize_i32(1),
-            CRC::Fail => serializer.serialize_i32(-1),
-            CRC::NoCrc => serializer.serialize_i32(0),
+            Crc::Ok => serializer.serialize_i32(1),
+            Crc::Invalid => serializer.serialize_i32(-1),
+            Crc::Missing => serializer.serialize_i32(0),
         }
     }
 }
@@ -340,7 +340,7 @@ pub struct RxPk {
     #[serde(default)]
     pub brd: u32,
     /// CRC status: 1 = OK, -1 = fail, 0 = no CRC
-    pub stat: CRC,
+    pub stat: Crc,
     /// Modulation identifier "LORA" or "Fsk"
     pub modu: Modulation,
     /// Lora datarate identifier (eg. SF12BW500)}
@@ -440,6 +440,12 @@ impl RxPk {
                 location: None,
                 context: self.tmst.to_be_bytes().to_vec(),
                 metadata: self.meta.as_ref().cloned().unwrap_or_default(),
+                crc_status: match self.stat {
+                    Crc::Ok => gw::CrcStatus::CrcOk,
+                    Crc::Invalid => gw::CrcStatus::BadCrc,
+                    Crc::Missing => gw::CrcStatus::NoCrc,
+                }
+                .into(),
             }),
             ..Default::default()
         };
@@ -1071,7 +1077,7 @@ mod test {
                     chan: 5,
                     rfch: 1,
                     brd: 3,
-                    stat: CRC::OK,
+                    stat: Crc::Ok,
                     modu: Modulation::Lora,
                     datr: DataRate::Lora(7, 125000),
                     codr: Some(CodeRate::Cr45),
@@ -1114,6 +1120,7 @@ mod test {
                     rf_chain: 1,
                     board: 3,
                     context: vec![0, 0, 4, 210],
+                    crc_status: gw::CrcStatus::CrcOk.into(),
                     ..Default::default()
                 }),
 
@@ -1140,7 +1147,7 @@ mod test {
                     chan: 5,
                     rfch: 1,
                     brd: 3,
-                    stat: CRC::OK,
+                    stat: Crc::Ok,
                     modu: Modulation::Lora,
                     datr: DataRate::Lora(7, 125000),
                     codr: Some(CodeRate::Cr45),
@@ -1186,6 +1193,7 @@ mod test {
                     rf_chain: 1,
                     board: 3,
                     context: vec![0, 0, 4, 210],
+                    crc_status: gw::CrcStatus::CrcOk.into(),
                     ..Default::default()
                 }),
 
@@ -1212,7 +1220,7 @@ mod test {
                     chan: 5,
                     rfch: 1,
                     brd: 3,
-                    stat: CRC::OK,
+                    stat: Crc::Ok,
                     modu: Modulation::Lora,
                     datr: DataRate::Lora(7, 125000),
                     codr: Some(CodeRate::Cr45),
@@ -1261,6 +1269,7 @@ mod test {
                     rf_chain: 1,
                     board: 3,
                     context: vec![0, 0, 4, 210],
+                    crc_status: gw::CrcStatus::CrcOk.into(),
                     ..Default::default()
                 }),
 
@@ -1287,7 +1296,7 @@ mod test {
                     chan: 0,
                     rfch: 1,
                     brd: 3,
-                    stat: CRC::OK,
+                    stat: Crc::Ok,
                     modu: Modulation::Lora,
                     datr: DataRate::Lora(7, 125000),
                     codr: Some(CodeRate::Cr45),
@@ -1345,6 +1354,7 @@ mod test {
                         rf_chain: 1,
                         board: 3,
                         context: vec![0, 0, 4, 210],
+                        crc_status: gw::CrcStatus::CrcOk.into(),
                         ..Default::default()
                     }),
                     ..Default::default()
@@ -1375,6 +1385,7 @@ mod test {
                         rf_chain: 1,
                         board: 3,
                         context: vec![0, 0, 4, 210],
+                        crc_status: gw::CrcStatus::CrcOk.into(),
                         ..Default::default()
                     }),
                     ..Default::default()
@@ -1401,7 +1412,7 @@ mod test {
                     chan: 5,
                     rfch: 1,
                     brd: 3,
-                    stat: CRC::OK,
+                    stat: Crc::Ok,
                     modu: Modulation::Fsk,
                     datr: DataRate::Fsk(50_000),
                     codr: None,
@@ -1439,6 +1450,7 @@ mod test {
                     rf_chain: 1,
                     board: 3,
                     context: vec![0, 0, 4, 210],
+                    crc_status: gw::CrcStatus::CrcOk.into(),
                     ..Default::default()
                 }),
 
@@ -1465,7 +1477,7 @@ mod test {
                     chan: 5,
                     rfch: 1,
                     brd: 3,
-                    stat: CRC::OK,
+                    stat: Crc::Ok,
                     modu: Modulation::LrFhss,
                     datr: DataRate::LrFhss(137_000),
                     codr: Some(CodeRate::Cr46),
@@ -1507,6 +1519,7 @@ mod test {
                     rf_chain: 1,
                     board: 3,
                     context: vec![0, 0, 4, 210],
+                    crc_status: gw::CrcStatus::CrcOk.into(),
                     ..Default::default()
                 }),
 
@@ -1533,7 +1546,7 @@ mod test {
                     chan: 5,
                     rfch: 1,
                     brd: 3,
-                    stat: CRC::OK,
+                    stat: Crc::Ok,
                     modu: Modulation::Lora,
                     datr: DataRate::Lora(7, 125000),
                     codr: Some(CodeRate::Cr45),
@@ -1585,6 +1598,7 @@ mod test {
                         .iter()
                         .cloned()
                         .collect(),
+                    crc_status: gw::CrcStatus::CrcOk.into(),
                     ..Default::default()
                 }),
 
