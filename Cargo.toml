@@ -20,7 +20,7 @@ chirpstack_api = { version = "4.3.0", default-features = false }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
-simple_logger = "4.0"
+simple_logger = "4.1"
 syslog = "6.0"
 prost = "0.11"
 anyhow = "1.0"
