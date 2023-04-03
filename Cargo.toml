@@ -10,7 +10,7 @@ edition = "2018"
 publish = false
 
 [dependencies]
-clap = { version = "4.1", default-features = false, features = [
+clap = { version = "4.2", default-features = false, features = [
     "std",
     "help",
     "usage",
