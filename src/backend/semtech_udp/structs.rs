@@ -6,7 +6,6 @@ use anyhow::Result;
 use chirpstack_api::{common, gw};
 use chrono::{DateTime, Utc};
 use rand::Rng;
-use regex::Regex;
 use serde::de::Error;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
@@ -176,20 +175,32 @@ impl<'de> Deserialize<'de> for DataRate {
     {
         match Value::deserialize(deserializer)? {
             Value::String(v) => {
-                let lora_regex = Regex::new(r"^SF(\d+)BW(\d+)$").unwrap();
-                let lr_fhss_regex = Regex::new(r"^M0CW(\d+)$").unwrap();
+                if v.starts_with("SF") {
+                    let parts: Vec<&str> = v.split("BW").collect();
+                    if parts.len() != 2 {
+                        return Err(D::Error::custom("unexpected string"));
+                    }
 
-                if let Some(c) = lora_regex.captures(&v) {
-                    return Ok(DataRate::Lora(
-                        c.get(1).unwrap().as_str().parse().unwrap(),
-                        c.get(2).unwrap().as_str().parse::<u32>().unwrap() * 1000,
-                    ));
-                }
+                    let sf = parts[0]
+                        .strip_prefix("SF")
+                        .ok_or_else(|| D::Error::custom("Invalid LoRa data-rate"))?;
+                    let sf = sf
+                        .parse::<u32>()
+                        .map_err(|_| D::Error::custom("Invalid LoRa data-rate"))?;
+                    let bw = parts[1]
+                        .parse::<u32>()
+                        .map_err(|_| D::Error::custom("Invalid LoRa data-rate"))?;
 
-                if let Some(c) = lr_fhss_regex.captures(&v) {
-                    return Ok(DataRate::LrFhss(
-                        c.get(1).unwrap().as_str().parse::<u32>().unwrap() * 1000,
-                    ));
+                    return Ok(DataRate::Lora(sf, bw * 1000));
+                } else if v.starts_with("M0CW") {
+                    let lr_fhss_cw = v
+                        .strip_prefix("M0CW")
+                        .ok_or_else(|| D::Error::custom("Invalid LR-FHSS data-rate"))?;
+                    let lr_fhss_cw = lr_fhss_cw
+                        .parse::<u32>()
+                        .map_err(|_| D::Error::custom("Invalid LR-FHSS data-rate"))?;
+
+                    return Ok(DataRate::LrFhss(lr_fhss_cw * 1000));
                 }
 
                 Err(D::Error::custom("unexpected string"))

@@ -6,12 +6,10 @@ use std::time::Duration;
 use anyhow::Result;
 use chirpstack_api::gw;
 use futures::stream::StreamExt;
-use handlebars::Handlebars;
 use log::{debug, error, info, trace};
 use once_cell::sync::OnceCell;
 use paho_mqtt as mqtt;
 use prost::Message;
-use regex::Regex;
 use serde::Serialize;
 use tokio::sync::mpsc;
 use tokio::time::sleep;
@@ -40,13 +38,12 @@ struct StateTopciContext {
     pub state: String,
 }
 
-struct State<'a> {
+struct State {
     client: mqtt::AsyncClient,
-    templates: Handlebars<'a>,
     qos: usize,
     json: bool,
     gateway_id: String,
-    command_topic_regex: Regex,
+    topic_prefix: String,
 }
 
 pub async fn setup(conf: &Configuration) -> Result<()> {
@@ -66,46 +63,12 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
         conf.mqtt.client_id.clone()
     };
 
-    // topic templates
-    let command_topic = "gateway/{{ gateway_id }}/command/{{ command }}".to_string();
-    let state_topic = "gateway/{{ gateway_id }}/state/{{ state }}".to_string();
-    let event_topic = "gateway/{{ gateway_id }}/event/{{ event }}".to_string();
-    let mut templates = Handlebars::new();
-    templates.register_escape_fn(handlebars::no_escape);
-    templates.register_template_string(
-        "command_topic",
-        if conf.mqtt.topic_prefix.is_empty() {
-            command_topic
-        } else {
-            format!("{}/{}", conf.mqtt.topic_prefix, command_topic)
-        },
-    )?;
-    templates.register_template_string(
-        "state_topic",
-        if conf.mqtt.topic_prefix.is_empty() {
-            state_topic
-        } else {
-            format!("{}/{}", conf.mqtt.topic_prefix, state_topic)
-        },
-    )?;
-    templates.register_template_string(
-        "event_topic",
-        if conf.mqtt.topic_prefix.is_empty() {
-            event_topic
-        } else {
-            format!("{}/{}", conf.mqtt.topic_prefix, event_topic)
-        },
-    )?;
-
-    // command regex
-    let command_topic_regex = Regex::new(&templates.render(
-        "command_topic",
-        &CommandTopicContext {
-            gateway_id: r"(?P<gateway_id>[a-fA-F0-9]{16})".into(),
-            command: r"(?P<command>\w+)".into(),
-        },
-    )?)
-    .unwrap();
+    // get mqtt prefix
+    let topic_prefix = if conf.mqtt.topic_prefix.is_empty() {
+        "".to_string()
+    } else {
+        format!("{}/", conf.mqtt.topic_prefix)
+    };
 
     // Create connect channel
     // This is needed as we can't subscribe within the set_connected_callback as this would
@@ -125,13 +88,7 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
         true => serde_json::to_vec(&lwt)?,
         false => lwt.encode_to_vec(),
     };
-    let lwt_topic = templates.render(
-        "state_topic",
-        &StateTopciContext {
-            gateway_id: gateway_id.clone(),
-            state: "conn".into(),
-        },
-    )?;
+    let lwt_topic = get_state_topic(&topic_prefix, &gateway_id, "conn");
     let lwt_msg = mqtt::Message::new_retained(lwt_topic, lwt, conf.mqtt.qos as i32);
 
     // create client
@@ -203,8 +160,7 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
 
     let state = State {
         client,
-        templates,
-        command_topic_regex,
+        topic_prefix,
         qos: conf.mqtt.qos,
         json: conf.mqtt.json,
         gateway_id: gateway_id.clone(),
@@ -214,20 +170,8 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
     // (Re)subscribe loop
     tokio::spawn({
         let state = state.clone();
-        let command_topic = state.templates.render(
-            "command_topic",
-            &CommandTopicContext {
-                gateway_id: gateway_id.clone(),
-                command: "+".into(),
-            },
-        )?;
-        let state_topic = state.templates.render(
-            "state_topic",
-            &StateTopciContext {
-                gateway_id: gateway_id.clone(),
-                state: "conn".into(),
-            },
-        )?;
+        let command_topic = get_command_topic(&state.topic_prefix, &state.gateway_id, "+");
+        let state_topic = get_state_topic(&state.topic_prefix, &state.gateway_id, "conn");
 
         let conn = gw::ConnState {
             gateway_id: gateway_id.clone(),
@@ -285,13 +229,7 @@ pub async fn send_uplink_frame(pl: &gw::UplinkFrame) -> Result<()> {
         true => serde_json::to_vec(&pl)?,
         false => pl.encode_to_vec(),
     };
-    let topic = state.templates.render(
-        "event_topic",
-        &EventTopicContext {
-            gateway_id: state.gateway_id.clone(),
-            event: "up".to_string(),
-        },
-    )?;
+    let topic = get_event_topic(&state.topic_prefix, &state.gateway_id, "up");
 
     info!(
         "Sending uplink event, uplink_id: {}, topic: {}",
@@ -313,13 +251,7 @@ pub async fn send_gateway_stats(pl: &gw::GatewayStats) -> Result<()> {
         true => serde_json::to_vec(&pl)?,
         false => pl.encode_to_vec(),
     };
-    let topic = state.templates.render(
-        "event_topic",
-        &EventTopicContext {
-            gateway_id: state.gateway_id.clone(),
-            event: "stats".to_string(),
-        },
-    )?;
+    let topic = get_event_topic(&state.topic_prefix, &state.gateway_id, "stats");
 
     info!("Sending gateway stats event, topic: {}", topic);
     let msg = mqtt::Message::new(topic, b, state.qos as i32);
@@ -337,13 +269,7 @@ pub async fn send_tx_ack(pl: &gw::DownlinkTxAck) -> Result<()> {
         true => serde_json::to_vec(&pl)?,
         false => pl.encode_to_vec(),
     };
-    let topic = state.templates.render(
-        "event_topic",
-        &EventTopicContext {
-            gateway_id: state.gateway_id.clone(),
-            event: "ack".to_string(),
-        },
-    )?;
+    let topic = get_event_topic(&state.topic_prefix, &state.gateway_id, "ack");
 
     info!(
         "Sending ack event, downlink_id: {}, topic: {}",
@@ -366,18 +292,14 @@ async fn message_callback(msg: mqtt::Message) -> Result<()> {
 
     info!("Received message, topic: {}, qos: {}", topic, qos);
 
-    let caps = state
-        .command_topic_regex
-        .captures(topic)
-        .ok_or_else(|| anyhow!("Topic does not match topic template"))?;
-    let gateway_id = caps
-        .name("gateway_id")
-        .ok_or_else(|| anyhow!("Extract gateway_id from topic error"))?
-        .as_str();
-    let command = caps
-        .name("command")
-        .ok_or_else(|| anyhow!("Extract command from topic error"))?
-        .as_str();
+    let parts: Vec<&str> = topic.split('/').collect();
+    if parts.len() < 4 {
+        return Err(anyhow!("Topic does not contain enough paths"));
+    }
+
+    // Get the last three elements: .../[gateway_id]/command/[command]
+    let gateway_id = parts[parts.len() - 3];
+    let command = parts[parts.len() - 1];
 
     match command {
         "down" => {
@@ -450,13 +372,7 @@ async fn handle_command_exec(pl: &gw::GatewayCommandExecRequest) -> Result<()> {
         false => resp.encode_to_vec(),
     };
 
-    let topic = state.templates.render(
-        "event_topic",
-        &EventTopicContext {
-            gateway_id: pl.gateway_id.clone(),
-            event: "exec".to_string(),
-        },
-    )?;
+    let topic = get_event_topic(&state.topic_prefix, &state.gateway_id, "exec");
 
     info!(
         "Sending gateway command exec event, exec_id: {}, topic: {}",
@@ -468,4 +384,16 @@ async fn handle_command_exec(pl: &gw::GatewayCommandExecRequest) -> Result<()> {
     trace!("Message sent");
 
     Ok(())
+}
+
+fn get_state_topic(prefix: &str, gateway_id: &str, state: &str) -> String {
+    format!("{}gateway/{}/state/{}", prefix, gateway_id, state)
+}
+
+fn get_event_topic(prefix: &str, gateway_id: &str, event: &str) -> String {
+    format!("{}gateway/{}/event/{}", prefix, gateway_id, event)
+}
+
+fn get_command_topic(prefix: &str, gateway_id: &str, command: &str) -> String {
+    format!("{}gateway/{}/command/{}", prefix, gateway_id, command)
 }

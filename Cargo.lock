@@ -169,7 +169,6 @@ dependencies = [
  "pbjson-types",
  "prost",
  "rand",
- "regex",
  "serde",
  "serde_json",
  "signal-hook",
