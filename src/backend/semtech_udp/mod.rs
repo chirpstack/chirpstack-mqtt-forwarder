@@ -25,6 +25,7 @@ struct State {
     downlink_cache: RwLock<HashMap<u16, DownlinkCache>>,
     pull_addr: RwLock<Option<SocketAddr>>,
     stats: Mutex<Stats>,
+    time_fallback_enabled: bool,
 }
 
 #[derive(Clone)]
@@ -236,6 +237,7 @@ impl Backend {
             downlink_cache: RwLock::new(HashMap::new()),
             pull_addr: RwLock::new(None),
             stats: Mutex::new(Stats::default()),
+            time_fallback_enabled: conf.backend.semtech_udp.time_fallback_enabled,
         };
         let state = Arc::new(state);
 
@@ -342,7 +344,7 @@ async fn handle_push_data(state: &Arc<State>, data: &[u8], remote: &SocketAddr) 
     };
     state.socket.send_to(&ack.to_vec(), remote).await?;
 
-    let uplink_frames = pl.to_proto_uplink_frames()?;
+    let uplink_frames = pl.to_proto_uplink_frames(state.time_fallback_enabled)?;
     let gateway_stats = pl.to_proto_gateway_stats()?;
 
     for uf in &uplink_frames {

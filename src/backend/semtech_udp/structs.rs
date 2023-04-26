@@ -287,10 +287,13 @@ impl PushData {
         })
     }
 
-    pub fn to_proto_uplink_frames(&self) -> Result<Vec<gw::UplinkFrame>> {
+    pub fn to_proto_uplink_frames(
+        &self,
+        time_fallback_enabled: bool,
+    ) -> Result<Vec<gw::UplinkFrame>> {
         let mut out: Vec<gw::UplinkFrame> = vec![];
         for rx in &self.payload.rxpk {
-            for f in rx.to_proto(&self.gateway_id)? {
+            for f in rx.to_proto(&self.gateway_id, time_fallback_enabled)? {
                 out.push(f);
             }
         }
@@ -377,7 +380,11 @@ pub struct RxPk {
 }
 
 impl RxPk {
-    fn to_proto(&self, gateway_id: &[u8]) -> Result<Vec<gw::UplinkFrame>> {
+    fn to_proto(
+        &self,
+        gateway_id: &[u8],
+        time_fallback_enabled: bool,
+    ) -> Result<Vec<gw::UplinkFrame>> {
         let mut rng = rand::thread_rng();
         let uplink_id = if cfg!(test) { 123 } else { rng.gen::<u32>() };
 
@@ -426,7 +433,16 @@ impl RxPk {
             rx_info: Some(gw::UplinkRxInfo {
                 gateway_id: hex::encode(gateway_id),
                 uplink_id,
-                time: self.time.map(pbjson_types::Timestamp::from),
+                time: match self.time.map(pbjson_types::Timestamp::from) {
+                    Some(v) => Some(v),
+                    None => {
+                        if time_fallback_enabled {
+                            Some(pbjson_types::Timestamp::from(Utc::now()))
+                        } else {
+                            None
+                        }
+                    }
+                },
                 time_since_gps_epoch: self
                     .tmms
                     .map(|t| pbjson_types::Duration::from(Duration::from_millis(t))),
@@ -1068,7 +1084,7 @@ mod test {
                 stat: None,
             },
         };
-        assert_eq!(0, pl.to_proto_uplink_frames().unwrap().len());
+        assert_eq!(0, pl.to_proto_uplink_frames(false).unwrap().len());
     }
 
     #[test]
@@ -1103,7 +1119,7 @@ mod test {
                 stat: None,
             },
         };
-        let pl = pl.to_proto_uplink_frames().unwrap();
+        let pl = pl.to_proto_uplink_frames(false).unwrap();
         assert_eq!(1, pl.len());
         assert_eq!(
             gw::UplinkFrame {
@@ -1173,7 +1189,7 @@ mod test {
                 stat: None,
             },
         };
-        let pl = pl.to_proto_uplink_frames().unwrap();
+        let pl = pl.to_proto_uplink_frames(false).unwrap();
         assert_eq!(1, pl.len());
         assert_eq!(
             gw::UplinkFrame {
@@ -1246,7 +1262,7 @@ mod test {
                 stat: None,
             },
         };
-        let pl = pl.to_proto_uplink_frames().unwrap();
+        let pl = pl.to_proto_uplink_frames(false).unwrap();
         assert_eq!(1, pl.len());
         assert_eq!(
             gw::UplinkFrame {
@@ -1335,7 +1351,7 @@ mod test {
                 stat: None,
             },
         };
-        let pl = pl.to_proto_uplink_frames().unwrap();
+        let pl = pl.to_proto_uplink_frames(false).unwrap();
         assert_eq!(2, pl.len());
         assert_eq!(
             vec![
@@ -1438,7 +1454,7 @@ mod test {
                 stat: None,
             },
         };
-        let pl = pl.to_proto_uplink_frames().unwrap();
+        let pl = pl.to_proto_uplink_frames(false).unwrap();
         assert_eq!(1, pl.len());
         assert_eq!(
             gw::UplinkFrame {
@@ -1503,7 +1519,7 @@ mod test {
                 stat: None,
             },
         };
-        let pl = pl.to_proto_uplink_frames().unwrap();
+        let pl = pl.to_proto_uplink_frames(false).unwrap();
         assert_eq!(1, pl.len());
         assert_eq!(
             gw::UplinkFrame {
@@ -1577,7 +1593,7 @@ mod test {
                 stat: None,
             },
         };
-        let pl = pl.to_proto_uplink_frames().unwrap();
+        let pl = pl.to_proto_uplink_frames(false).unwrap();
         assert_eq!(1, pl.len());
         assert_eq!(
             gw::UplinkFrame {
@@ -1617,6 +1633,76 @@ mod test {
             },
             pl[0]
         );
+    }
+
+    #[test]
+    fn test_uplink_no_time() {
+        let pl = PushData {
+            random_token: 123,
+            gateway_id: [1, 2, 3, 4, 5, 6, 7, 8],
+            payload: PushDataPayload {
+                rxpk: vec![RxPk {
+                    time: None,
+                    tmms: None,
+                    tmst: 1234,
+                    ftime: None,
+                    freq: 868.1,
+                    chan: 5,
+                    rfch: 1,
+                    brd: 3,
+                    stat: Crc::Ok,
+                    modu: Modulation::Lora,
+                    datr: DataRate::Lora(7, 125000),
+                    codr: Some(CodeRate::Cr45),
+                    rssi: 120,
+                    lsnr: Some(3.5),
+                    hpw: None,
+                    size: 4,
+                    data: vec![4, 3, 2, 1],
+                    rsig: vec![],
+                    meta: None,
+                }],
+                stat: None,
+            },
+        };
+        let pl = pl.to_proto_uplink_frames(false).unwrap();
+        assert_eq!(1, pl.len());
+        assert!(pl[0].rx_info.as_ref().unwrap().time.is_none());
+    }
+
+    #[test]
+    fn test_uplink_no_time_time_fallback_enabled() {
+        let pl = PushData {
+            random_token: 123,
+            gateway_id: [1, 2, 3, 4, 5, 6, 7, 8],
+            payload: PushDataPayload {
+                rxpk: vec![RxPk {
+                    time: None,
+                    tmms: None,
+                    tmst: 1234,
+                    ftime: None,
+                    freq: 868.1,
+                    chan: 5,
+                    rfch: 1,
+                    brd: 3,
+                    stat: Crc::Ok,
+                    modu: Modulation::Lora,
+                    datr: DataRate::Lora(7, 125000),
+                    codr: Some(CodeRate::Cr45),
+                    rssi: 120,
+                    lsnr: Some(3.5),
+                    hpw: None,
+                    size: 4,
+                    data: vec![4, 3, 2, 1],
+                    rsig: vec![],
+                    meta: None,
+                }],
+                stat: None,
+            },
+        };
+        let pl = pl.to_proto_uplink_frames(true).unwrap();
+        assert_eq!(1, pl.len());
+        assert!(pl[0].rx_info.as_ref().unwrap().time.is_some());
     }
 
     #[test]

@@ -121,12 +121,14 @@ impl Default for Concentratord {
 #[serde(default)]
 pub struct SemtechUdp {
     pub bind: String,
+    pub time_fallback_enabled: bool,
 }
 
 impl Default for SemtechUdp {
     fn default() -> Self {
         SemtechUdp {
             bind: "0.0.0.0:1700".to_string(),
+            time_fallback_enabled: false,
         }
     }
 }

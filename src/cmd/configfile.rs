@@ -137,6 +137,12 @@ pub fn run(config: &Configuration) {
     # packet-forwarder matches this port.
     bind="{{ backend.semtech_udp.bind }}"
 
+    # Time fallback.
+    #
+    # In case the UDP packet-forwarder does not set the 'time' field, then the
+    # server-time will be used as fallback if this option is enabled.
+    time_fallback_enabled={{ backend.semtech_udp.time_fallback_enabled }}
+
 
 # Gateway metadata configuration.
 [metadata]
