@@ -56,13 +56,18 @@ impl Backend {
         info!("Received gateway id, gateway_id: {}", gateway_id);
 
         tokio::spawn({
-            let forward_crc_ok = conf.backend.forward_crc_ok;
-            let forward_crc_invalid = conf.backend.forward_crc_invalid;
-            let forward_crc_missing = conf.backend.forward_crc_missing;
+            let forward_crc_ok = conf.backend.filters.forward_crc_ok;
+            let forward_crc_invalid = conf.backend.filters.forward_crc_invalid;
+            let forward_crc_missing = conf.backend.filters.forward_crc_missing;
+            let filters = lrwn_filters::Filters {
+                dev_addr_prefixes: conf.backend.filters.dev_addr_prefixes.clone(),
+                join_eui_prefixes: conf.backend.filters.join_eui_prefixes.clone(),
+            };
 
             async move {
                 event_loop(
                     event_sock,
+                    filters,
                     forward_crc_ok,
                     forward_crc_invalid,
                     forward_crc_missing,
@@ -148,6 +153,7 @@ impl BackendTrait for Backend {
 
 async fn event_loop(
     event_sock: zmq::Socket,
+    filters: lrwn_filters::Filters,
     forward_crc_ok: bool,
     forward_crc_invalid: bool,
     forward_crc_missing: bool,
@@ -187,6 +193,7 @@ async fn event_loop(
                 if let Err(err) = handle_event_msg(
                     &msg[0],
                     &msg[1],
+                    &filters,
                     forward_crc_ok,
                     forward_crc_invalid,
                     forward_crc_missing,
@@ -212,6 +219,7 @@ async fn event_loop(
 async fn handle_event_msg(
     event: &[u8],
     pl: &[u8],
+    filters: &lrwn_filters::Filters,
     forward_crc_ok: bool,
     forward_crc_invalid: bool,
     forward_crc_missing: bool,
@@ -235,11 +243,18 @@ async fn handle_event_msg(
                 }
             }
 
-            info!(
-                "Received uplink frame, uplink_id: {}",
-                pl.rx_info.as_ref().map(|v| v.uplink_id).unwrap_or_default(),
-            );
-            send_uplink_frame(&pl).await?;
+            if lrwn_filters::matches(&pl.phy_payload, filters) {
+                info!(
+                    "Received uplink frame, uplink_id: {}",
+                    pl.rx_info.as_ref().map(|v| v.uplink_id).unwrap_or_default(),
+                );
+                send_uplink_frame(&pl).await?;
+            } else {
+                debug!(
+                    "Ignoring uplink frame because of dev_addr and join_eui filters, uplink_id: {}",
+                    pl.rx_info.as_ref().map(|v| v.uplink_id).unwrap_or_default()
+                );
+            }
         }
         "stats" => {
             let pl = gw::GatewayStats::decode(pl)?;

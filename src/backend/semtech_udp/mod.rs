@@ -7,7 +7,7 @@ use std::time::{Duration, SystemTime};
 use anyhow::Result;
 use async_trait::async_trait;
 use chirpstack_api::gw;
-use log::{info, trace, warn};
+use log::{debug, info, trace, warn};
 use prost::Message;
 use tokio::net::UdpSocket;
 use tokio::sync::{Mutex, RwLock};
@@ -26,6 +26,10 @@ struct State {
     pull_addr: RwLock<Option<SocketAddr>>,
     stats: Mutex<Stats>,
     time_fallback_enabled: bool,
+    forward_crc_ok: bool,
+    forward_crc_invalid: bool,
+    forward_crc_missing: bool,
+    filters: lrwn_filters::Filters,
 }
 
 #[derive(Clone)]
@@ -238,6 +242,13 @@ impl Backend {
             pull_addr: RwLock::new(None),
             stats: Mutex::new(Stats::default()),
             time_fallback_enabled: conf.backend.semtech_udp.time_fallback_enabled,
+            forward_crc_invalid: conf.backend.filters.forward_crc_invalid,
+            forward_crc_missing: conf.backend.filters.forward_crc_missing,
+            forward_crc_ok: conf.backend.filters.forward_crc_ok,
+            filters: lrwn_filters::Filters {
+                dev_addr_prefixes: conf.backend.filters.dev_addr_prefixes.clone(),
+                join_eui_prefixes: conf.backend.filters.join_eui_prefixes.clone(),
+            },
         };
         let state = Arc::new(state);
 
@@ -348,8 +359,29 @@ async fn handle_push_data(state: &Arc<State>, data: &[u8], remote: &SocketAddr) 
     let gateway_stats = pl.to_proto_gateway_stats()?;
 
     for uf in &uplink_frames {
-        state.count_uplink(uf).await?;
-        send_uplink_frame(uf).await?;
+        if let Some(rx_info) = &uf.rx_info {
+            if !((rx_info.crc_status() == gw::CrcStatus::CrcOk && state.forward_crc_ok)
+                || (rx_info.crc_status() == gw::CrcStatus::BadCrc && state.forward_crc_invalid)
+                || (rx_info.crc_status() == gw::CrcStatus::NoCrc && state.forward_crc_missing))
+            {
+                debug!(
+                    "Ignoring uplink frame because of forward_crc_ flags, uplink_id: {}",
+                    uf.rx_info.as_ref().map(|v| v.uplink_id).unwrap_or_default(),
+                );
+
+                continue;
+            }
+        }
+
+        if lrwn_filters::matches(&uf.phy_payload, &state.filters) {
+            state.count_uplink(uf).await?;
+            send_uplink_frame(uf).await?;
+        } else {
+            debug!(
+                "Ignoring uplink frame because of dev_addr and join_eui filters, uplink_id: {}",
+                uf.rx_info.as_ref().map(|v| v.uplink_id).unwrap_or_default()
+            );
+        }
     }
 
     if let Some(mut stats) = gateway_stats {

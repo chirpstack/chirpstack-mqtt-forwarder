@@ -9,7 +9,7 @@ pub fn setup(name: &str, level: log::Level, syslog: bool) -> Result<()> {
             facility: Facility::LOG_USER,
             hostname: None,
             process: name.to_string(),
-            pid: process::id() as u32,
+            pid: process::id(),
         };
         let logger = syslog::unix(formatter).map_err(|e| anyhow!("{}", e))?;
         log::set_boxed_logger(Box::new(BasicLogger::new(logger)))

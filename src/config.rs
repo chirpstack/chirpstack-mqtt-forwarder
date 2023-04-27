@@ -79,9 +79,7 @@ impl Default for Mqtt {
 #[serde(default)]
 pub struct Backend {
     pub enabled: String,
-    pub forward_crc_ok: bool,
-    pub forward_crc_invalid: bool,
-    pub forward_crc_missing: bool,
+    pub filters: Filters,
     pub gateway_id: String,
     pub semtech_udp: SemtechUdp,
     pub concentratord: Concentratord,
@@ -91,12 +89,32 @@ impl Default for Backend {
     fn default() -> Self {
         Backend {
             enabled: "semtech_udp".to_string(),
-            forward_crc_ok: true,
-            forward_crc_invalid: false,
-            forward_crc_missing: false,
+            filters: Filters::default(),
             gateway_id: "".into(),
             semtech_udp: SemtechUdp::default(),
             concentratord: Concentratord::default(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(default)]
+pub struct Filters {
+    pub forward_crc_ok: bool,
+    pub forward_crc_invalid: bool,
+    pub forward_crc_missing: bool,
+    pub dev_addr_prefixes: Vec<lrwn_filters::DevAddrPrefix>,
+    pub join_eui_prefixes: Vec<lrwn_filters::EuiPrefix>,
+}
+
+impl Default for Filters {
+    fn default() -> Self {
+        Filters {
+            forward_crc_ok: true,
+            forward_crc_invalid: false,
+            forward_crc_missing: false,
+            dev_addr_prefixes: vec![],
+            join_eui_prefixes: vec![],
         }
     }
 }

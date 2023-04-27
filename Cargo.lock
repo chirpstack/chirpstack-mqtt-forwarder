@@ -171,6 +171,7 @@ dependencies = [
  "handlebars",
  "hex",
  "log",
+ "lrwn_filters",
  "once_cell",
  "paho-mqtt",
  "pbjson-types",
@@ -858,6 +859,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "abb12e687cfb44aa40f41fc3978ef76448f9b6038cad6aef4259d3c095a2382e"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "lrwn_filters"
+version = "4.3.3-test.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be683d1ab99d2d8c9aa09fecdaca127d0cacee13d4d23c8e95dcdb89a94c6ddd"
+dependencies = [
+ "hex",
+ "serde",
+ "thiserror",
 ]
 
 [[package]]
