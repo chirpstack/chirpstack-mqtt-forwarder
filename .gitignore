@@ -1,8 +1,12 @@
 # Hidden files
 .*
+!.cargo
+!.github
+!.vscode
+!.env
 
 # Config files
-/*.toml
+chirpstack-mqtt-forwarder.toml
 
 # Rust target directory
 /target
@@ -10,7 +14,3 @@
 # IPK packages
 *.ipk
 /dist
-
-# Exclude from gitignore
-!/.github
-!/.cargo

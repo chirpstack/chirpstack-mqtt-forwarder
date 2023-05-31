@@ -35,7 +35,7 @@ hex = "0.4"
 base64 = "0.21"
 rand = "0.8"
 pbjson-types = "0.5"
-paho-mqtt = { version = "0.12", features = ["vendored-ssl", "build_bindgen"] }
+paho-mqtt = { version = "0.12", features = ["ssl", "build_bindgen"] }
 handlebars = "4.3"
 tokio = { version = "1.27", features = [
     "macros",
@@ -49,6 +49,9 @@ tokio = { version = "1.27", features = [
 futures = "0.3"
 async-trait = "0.1"
 zmq = { version = "0.10", optional = true }
+
+[dev-dependencies]
+dotenv = "0.15"
 
 [features]
 default = ["semtech_udp", "concentratord"]

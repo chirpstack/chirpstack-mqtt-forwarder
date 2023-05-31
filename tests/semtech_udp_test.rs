@@ -1,3 +1,4 @@
+use std::env;
 use std::io::Cursor;
 use std::time::Duration;
 
@@ -13,6 +14,9 @@ use chirpstack_mqtt_forwarder::config;
 
 #[tokio::test]
 async fn end_to_end() {
+    dotenv::dotenv().ok();
+    dotenv::from_filename(".env.local").ok();
+
     let mut buffer: [u8; 65535] = [0; 65535];
 
     let mut c = config::Configuration {
@@ -21,7 +25,7 @@ async fn end_to_end() {
             ..Default::default()
         },
         mqtt: config::Mqtt {
-            server: "tcp://mosquitto:1883".into(),
+            server: env::var("TEST_MQTT_BROKER_URL").unwrap(),
             ..Default::default()
         },
         ..Default::default()
@@ -41,7 +45,7 @@ async fn end_to_end() {
 
     // MQTT
     let create_opts = mqtt::CreateOptionsBuilder::new()
-        .server_uri("tcp://mosquitto:1883")
+        .server_uri(env::var("TEST_MQTT_BROKER_URL").unwrap())
         .persistence(None)
         .finalize();
     let mut client = mqtt::AsyncClient::new(create_opts).unwrap();

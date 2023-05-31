@@ -1,16 +1,13 @@
-[target.mips-unknown-linux-musl]
-linker = "mips-linux-muslsf-cc"
-# https://github.com/rust-lang/rust/issues/80693
-rustflags = ["-C", "target-feature=+crt-static", "-C", "link-arg=-s", "-C", "link-arg=-lc", "-C", "link-arg=-lgcc"]
+[target.aarch64-unknown-linux-musl]
+rustflags = ["-C", "target-feature=+crt-static", "-C", "link-arg=-s", "-C", "link-arg=-lc", "-C", "link-arg=-lgcc", "-L", "native=/usr/local/aarch64-linux-musl-target/lib", "-l", "static=stdc++"]
 
-[target.armv5te-unknown-linux-gnueabi]
-linker = "arm-linux-gnueabi-gcc"
+[target.armv7-unknown-linux-musleabihf]
+rustflags = ["-C", "target-feature=+crt-static", "-C", "link-arg=-s", "-C", "link-arg=-lc", "-C", "link-arg=-lgcc", "-L", "native=/usr/local/arm-linux-musleabihf-target/lib", "-l", "static=stdc++"]
+
+[target.mips-unknown-linux-musl]
+rustflags = ["-C", "target-feature=+crt-static", "-C", "link-arg=-s", "-C", "link-arg=-lc", "-C", "link-arg=-lgcc", "-L", "native=/usr/local/mips-linux-muslsf-target/lib", "-l", "static=stdc++"]
+
+[target.armv5te-unknown-linux-musleabi]
 # Workaround for:
 # https://github.com/rust-lang/compiler-builtins/issues/420
-rustflags = ["-C", "link-arg=-Wl,--allow-multiple-definition"]
-
-[target.armv7-unknown-linux-gnueabihf]
-linker = "arm-linux-gnueabihf-gcc"
-
-[target.aarch64-unknown-linux-gnu]
-linker = "aarch64-linux-gnu-gcc"
+rustflags = ["-C", "link-arg=-Wl,--allow-multiple-definition", "-C", "target-feature=+crt-static", "-C", "link-arg=-s", "-C", "link-arg=-lc", "-C", "link-arg=-lgcc", "-L", "native=/usr/local/arm-linux-musleabi-target/lib", "-l", "static=stdc++"]

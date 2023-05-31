@@ -7,7 +7,7 @@ REV="r1"
 PACKAGE_NAME=`cargo metadata --no-deps --format-version 1 | jq -r ".packages[0].name"`
 PACKAGE_VERSION=`cargo metadata --no-deps --format-version 1| jq -r ".packages[0].version"`
 PACKAGE_DESCRIPTION=`cargo metadata --no-deps --format-version 1| jq -r ".packages[0].description"`
-BIN_PATH="../../../../target/armv7-unknown-linux-gnueabihf/release/${PACKAGE_NAME}"
+BIN_PATH="../../../../target/armv7-unknown-linux-musleabihf/release/${PACKAGE_NAME}"
 DIR=`dirname $0`
 PACKAGE_DIR="${DIR}/package"
 

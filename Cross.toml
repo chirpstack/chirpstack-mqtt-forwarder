@@ -1,0 +1,11 @@
+[target.aarch64-unknown-linux-musl]
+dockerfile="cross/Dockerfile.aarch64-unknown-linux-musl"
+
+[target.armv7-unknown-linux-musleabihf]
+dockerfile="cross/Dockerfile.armv7-unknown-linux-musleabihf"
+
+[target.mips-unknown-linux-musl]
+dockerfile="cross/Dockerfile.mips-unknown-linux-musl"
+
+[target.armv5te-unknown-linux-musleabi]
+dockerfile="cross/Dockerfile.armv5te-unknown-linux-musleabi"
