@@ -2,6 +2,7 @@
 
 START=100
 STOP=100
+PACKAGE_NAME=chirpstack-mqtt-forwarder
 
 start() {
     echo "Starting $PACKAGE_NAME"
