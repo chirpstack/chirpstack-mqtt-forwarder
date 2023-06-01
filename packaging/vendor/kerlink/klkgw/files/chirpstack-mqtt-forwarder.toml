@@ -16,15 +16,13 @@
 
   [backend.concentratord]
     event_url="ipc:///tmp/concentratord_event" 
-	command_url="ipc:///tmp/concentratord_command"
+    command_url="ipc:///tmp/concentratord_command"
 
   [backend.semtech_udp]
     bind="0.0.0.0:1700"
 
 [mqtt]
-  event_topic="eu868/gateway/{{ gateway_id }}/event/{{ event }}"
-  command_topic="eu868/gateway/{{ gateway_id }}/command/{{ command }}"
-  state_topic="eu868/gateway/{{ gateway_id }}/state/{{ state }}"
+  topic_prefix="eu868"
   server="tcp://127.0.0.1:1883"
   username=""
   password=""
