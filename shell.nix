@@ -12,7 +12,6 @@ pkgs.mkShell {
     pkgs.cmake
     pkgs.clang
     pkgs.openssl
-    pkgs.docker
     pkgs.opkg-utils
     pkgs.jq
     pkgs.cargo-cross
