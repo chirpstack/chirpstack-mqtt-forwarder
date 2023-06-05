@@ -38,7 +38,7 @@ docker-devshell:
 	docker-compose run --rm chirpstack-mqtt-forwarder
 
 # Package the compiled binaries.
-package: package-targz-armv7hf package-targz-arm64 \
+package: package-targz-armv7hf package-targz-arm64 package-deb \
 	package-dragino \
 	package-multitech-conduit \
 	package-multitech-conduit-ap \
@@ -54,6 +54,13 @@ package-targz-arm64:
 	$(eval PKG_VERSION := $(shell cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version'))
 	mkdir -p dist
 	tar -czvf dist/chirpstack-mqtt-forwarder_$(PKG_VERSION)_arm64.tar.gz -C target/aarch64-unknown-linux-musl/release chirpstack-mqtt-forwarder
+
+package-deb:
+	cargo deb --target aarch64-unknown-linux-musl --no-build --no-strip
+	cargo deb --target armv7-unknown-linux-musleabihf --no-build --no-strip
+	mkdir -p dist
+	cp target/armv7-unknown-linux-musleabihf/debian/*.deb ../dist
+	cp target/aarch64-unknown-linux-musl/debian/*.deb ../dist
 
 package-dragino:
 	cd packaging/vendor/dragino/mips_24kc && ./package.sh

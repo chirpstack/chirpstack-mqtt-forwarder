@@ -58,6 +58,27 @@ default = ["semtech_udp", "concentratord"]
 semtech_udp = []
 concentratord = ["zmq"]
 
+# Debian packaging.
+[package.metadata.deb]
+assets = [
+    [
+        "target/release/chirpstack-mqtt-forwarder",
+        "usr/bin/",
+        "755",
+    ],
+    [
+        "packaging/debian/chirpstack-mqtt-forwarder.toml",
+        "etc/chirpstack-mqtt-forwarder/",
+        "640",
+    ],
+]
+conf-files = [
+    "/etc/chirpstack-mqtt-forwarder/chirpstack-mqtt-forwarder.toml",
+]
+suggests = "mosquitto"
+maintainer-scripts = "packaging/debian/"
+systemd-units = { enable = true }
+
 [profile.release]
 strip = true
 opt-level = "z"

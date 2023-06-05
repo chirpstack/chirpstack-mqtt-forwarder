@@ -1,0 +1,21 @@
+# For a complete configuration example and documentation, please refer to:
+# https://www.chirpstack.io/chirpstack-mqtt-forwarder/configuration.html
+
+[logging]
+  level="info"
+  log_to_syslog=false
+
+[backend]
+  enabled="semtech_udp" 
+
+  [backend.semtech_udp]
+    udp_bind="0.0.0.0:1700"
+
+[mqtt]
+  topic_prefix="eu868"
+  server="tcp://127.0.0.1:1883"
+  username=""
+  password=""
+  ca_cert=""
+  tls_cert=""
+  tls_key=""

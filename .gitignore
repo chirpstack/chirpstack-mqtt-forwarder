@@ -6,7 +6,7 @@
 !.env
 
 # Config files
-chirpstack-mqtt-forwarder.toml
+/chirpstack-mqtt-forwarder.toml
 
 # Rust target directory
 /target

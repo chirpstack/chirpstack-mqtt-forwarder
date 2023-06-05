@@ -1,0 +1,14 @@
+[Unit]
+Description=ChirpStack MQTT Forwarder
+Documentation=https://www.chirpstack.io/
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=chirpstack
+Group=chirpstack
+ExecStart=/usr/bin/chirpstack-mqtt-forwarder -c /etc/chirpstack-mqtt-forwarder/chirpstack-mqtt-forwarder.toml
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
