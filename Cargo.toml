@@ -16,10 +16,10 @@ clap = { version = "4.3", default-features = false, features = [
     "usage",
     "derive",
 ] }
-chirpstack_api = { version = "4.3.1", default-features = false, features = [
+chirpstack_api = { version = "4.4", default-features = false, features = [
     "json",
 ] }
-lrwn_filters = { version = "4.3.3-test.1", features = ["serde"] }
+lrwn_filters = { version = "4.3", features = ["serde"] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
