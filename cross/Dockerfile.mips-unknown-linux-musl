@@ -1,6 +1,6 @@
 FROM ghcr.io/cross-rs/mips-unknown-linux-musl:latest
 
-ENV OPENSSL_VERSION=1.1.1t
+ENV OPENSSL_VERSION=3.1.2
 ENV OPENSSL_TARGET=linux-mips32
 ENV MUSL_PREFIX=mips-linux-muslsf
 
