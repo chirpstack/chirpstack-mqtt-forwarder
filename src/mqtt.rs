@@ -115,8 +115,12 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
     conn_opts_b.will_message(lwt_msg);
     conn_opts_b.automatic_reconnect(Duration::from_secs(1), Duration::from_secs(30));
     conn_opts_b.clean_session(conf.mqtt.clean_session);
-    conn_opts_b.user_name(&conf.mqtt.username);
-    conn_opts_b.password(&conf.mqtt.password);
+    if !conf.mqtt.username.is_empty() {
+        conn_opts_b.user_name(&conf.mqtt.username);
+    }
+    if !conf.mqtt.password.is_empty() {
+        conn_opts_b.password(&conf.mqtt.password);
+    }
     if !conf.mqtt.ca_cert.is_empty()
         || !conf.mqtt.tls_cert.is_empty()
         || !conf.mqtt.tls_key.is_empty()
