@@ -7,6 +7,9 @@ rustflags = ["-C", "target-feature=+crt-static", "-C", "link-arg=-s", "-C", "lin
 [target.mips-unknown-linux-musl]
 rustflags = ["-C", "target-feature=+crt-static", "-C", "link-arg=-s", "-C", "link-arg=-lc", "-C", "link-arg=-lgcc", "-L", "native=/usr/local/mips-linux-muslsf-target/lib", "-l", "static=stdc++"]
 
+[target.mipsel-unknown-linux-musl]
+rustflags = ["-C", "target-feature=+crt-static", "-C", "link-arg=-s", "-C", "link-arg=-lc", "-C", "link-arg=-lgcc", "-L", "native=/usr/local/mipsel-linux-muslsf-target/lib", "-l", "static=stdc++"]
+
 [target.armv5te-unknown-linux-musleabi]
 # Workaround for:
 # https://github.com/rust-lang/compiler-builtins/issues/420

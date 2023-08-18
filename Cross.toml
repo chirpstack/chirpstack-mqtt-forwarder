@@ -7,5 +7,8 @@ dockerfile="cross/Dockerfile.armv7-unknown-linux-musleabihf"
 [target.mips-unknown-linux-musl]
 dockerfile="cross/Dockerfile.mips-unknown-linux-musl"
 
+[target.mipsel-unknown-linux-musl]
+dockerfile="cross/Dockerfile.mipsel-unknown-linux-musl"
+
 [target.armv5te-unknown-linux-musleabi]
 dockerfile="cross/Dockerfile.armv5te-unknown-linux-musleabi"

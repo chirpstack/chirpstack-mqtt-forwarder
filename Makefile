@@ -6,6 +6,7 @@ build:
 	cross build --target armv5te-unknown-linux-musleabi --release
 	cross build --target armv7-unknown-linux-musleabihf --release
 	cross build --target mips-unknown-linux-musl --release --no-default-features --features semtech_udp
+	cross build --target mipsel-unknown-linux-musl --release --no-default-features --features semtech_udp
 
 # Build distributable binaries.
 dist: build package
