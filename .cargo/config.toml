@@ -1,16 +1,57 @@
 [target.aarch64-unknown-linux-musl]
-rustflags = ["-C", "target-feature=+crt-static", "-C", "link-arg=-s", "-C", "link-arg=-lc", "-C", "link-arg=-lgcc", "-L", "native=/usr/local/aarch64-linux-musl-target/lib", "-l", "static=stdc++"]
+  rustflags = [
+    "-C", "target-feature=+crt-static",
+    "-C", "link-arg=-s",
+    "-C", "link-arg=-lc",
+    "-C", "link-arg=-lgcc",
+    "-L", "native=/usr/local/aarch64-linux-musl-target/lib",
+    "-l", "static=stdc++",
+  ]
 
 [target.armv7-unknown-linux-musleabihf]
-rustflags = ["-C", "target-feature=+crt-static", "-C", "link-arg=-s", "-C", "link-arg=-lc", "-C", "link-arg=-lgcc", "-L", "native=/usr/local/arm-linux-musleabihf-target/lib", "-l", "static=stdc++"]
+  rustflags = [
+    "-C", "target-feature=+crt-static",
+    "-C", "link-arg=-s",
+    "-C", "link-arg=-lc",
+    "-C", "link-arg=-lgcc",
+    "-L", "native=/usr/local/arm-linux-musleabihf-target/lib",
+    "-l", "static=stdc++",
+  ]
 
 [target.mips-unknown-linux-musl]
-rustflags = ["-C", "target-feature=+crt-static", "-C", "link-arg=-s", "-C", "link-arg=-lc", "-C", "link-arg=-lgcc", "-L", "native=/usr/local/mips-linux-muslsf-target/lib", "-l", "static=stdc++"]
+  rustflags = [
+    "-C", "link-arg=-Wl,--allow-multiple-definition",
+    "-C", "target-feature=+crt-static",
+    "-C", "link-arg=-s",
+    "-C", "link-arg=-lc",
+    "-C", "link-arg=-lgcc",
+    "-C", "link-arg=-latomic",
+    "-L", "native=/usr/local/mips-linux-muslsf-target/lib",
+    "-l", "static=stdc++",
+  ]
 
 [target.mipsel-unknown-linux-musl]
-rustflags = ["-C", "target-feature=+crt-static", "-C", "link-arg=-s", "-C", "link-arg=-lc", "-C", "link-arg=-lgcc", "-L", "native=/usr/local/mipsel-linux-muslsf-target/lib", "-l", "static=stdc++"]
+  rustflags = [
+    "-C", "link-arg=-Wl,--allow-multiple-definition",
+    "-C", "target-feature=+crt-static",
+    "-C", "link-arg=-s",
+    "-C", "link-arg=-lc",
+    "-C", "link-arg=-lgcc",
+    "-C", "link-arg=-latomic",
+    "-L", "native=/usr/local/mipsel-linux-muslsf-target/lib",
+    "-l", "static=stdc++",
+  ]
 
 [target.armv5te-unknown-linux-musleabi]
-# Workaround for:
-# https://github.com/rust-lang/compiler-builtins/issues/420
-rustflags = ["-C", "link-arg=-Wl,--allow-multiple-definition", "-C", "target-feature=+crt-static", "-C", "link-arg=-s", "-C", "link-arg=-lc", "-C", "link-arg=-lgcc", "-L", "native=/usr/local/arm-linux-musleabi-target/lib", "-l", "static=stdc++"]
+  # Workaround for:
+  # https://github.com/rust-lang/compiler-builtins/issues/420
+  rustflags = [
+    "-C", "link-arg=-Wl,--allow-multiple-definition",
+    "-C", "target-feature=+crt-static",
+    "-C", "link-arg=-s",
+    "-C", "link-arg=-lc",
+    "-C", "link-arg=-lgcc",
+    "-C", "link-arg=-latomic",
+    "-L", "native=/usr/local/arm-linux-musleabi-target/lib",
+    "-l", "static=stdc++",
+  ]
