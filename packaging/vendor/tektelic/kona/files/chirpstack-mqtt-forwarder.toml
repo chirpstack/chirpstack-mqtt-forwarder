@@ -1,5 +1,5 @@
 # For a complete configuration example and documentation, please refer to:
-# https://www.chirpstack.io/chirpstack-mqtt-forwarder/configuration.html
+# https://www.chirpstack.io/docs/chirpstack-mqtt-forwarder/configuration.html
 
 [logging]
   level="info"
