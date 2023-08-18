@@ -44,7 +44,8 @@ package: package-targz-armv7hf package-targz-arm64 package-deb \
 	package-multitech-conduit \
 	package-multitech-conduit-ap \
 	package-tektelic-kona \
-	package-kerlink-klkgw
+	package-kerlink-klkgw \
+	package-rak-ramips-24kec
 
 package-targz-armv7hf:
 	$(eval PKG_VERSION := $(shell cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version'))
@@ -77,6 +78,11 @@ package-multitech-conduit-ap:
 	cd packaging/vendor/multitech/conduit_ap && ./package.sh
 	mkdir -p dist/vendor/multitech/conduit_ap
 	cp packaging/vendor/multitech/conduit_ap/*.ipk dist/vendor/multitech/conduit_ap
+
+package-rak-ramips-24kec:
+	cd packaging/vendor/rak/ramips_24kec && ./package.sh
+	mkdir -p dist/vendor/rak/ramips_24kec
+	cp packaging/vendor/rak/ramips_24kec/*.ipk dist/vendor/rak/ramips_24kec
 
 package-tektelic-kona:
 	cd packaging/vendor/tektelic/kona && ./package.sh
