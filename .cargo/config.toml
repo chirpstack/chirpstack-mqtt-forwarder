@@ -25,7 +25,6 @@
     "-C", "link-arg=-s",
     "-C", "link-arg=-lc",
     "-C", "link-arg=-lgcc",
-    "-C", "link-arg=-latomic",
     "-L", "native=/usr/local/mips-linux-muslsf-target/lib",
     "-l", "static=stdc++",
   ]
@@ -37,7 +36,6 @@
     "-C", "link-arg=-s",
     "-C", "link-arg=-lc",
     "-C", "link-arg=-lgcc",
-    "-C", "link-arg=-latomic",
     "-L", "native=/usr/local/mipsel-linux-muslsf-target/lib",
     "-l", "static=stdc++",
   ]
@@ -51,7 +49,6 @@
     "-C", "link-arg=-s",
     "-C", "link-arg=-lc",
     "-C", "link-arg=-lgcc",
-    "-C", "link-arg=-latomic",
     "-L", "native=/usr/local/arm-linux-musleabi-target/lib",
     "-l", "static=stdc++",
   ]
