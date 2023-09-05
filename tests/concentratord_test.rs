@@ -2,10 +2,12 @@ use std::env;
 use std::io::Cursor;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::Duration;
 
 use futures::StreamExt;
 use paho_mqtt as mqtt;
 use prost::Message;
+use tokio::time::sleep;
 
 use chirpstack_api::gw;
 use chirpstack_mqtt_forwarder::config;
@@ -78,6 +80,8 @@ async fn end_to_end() {
         }
     });
 
+    // Sleep some time to receive message from MQTT broker.
+    sleep(Duration::from_millis(100)).await;
     for _ in 0..stream.len() {
         stream.next().await.unwrap().unwrap();
     }
