@@ -43,7 +43,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     strategy:
       matrix:
-        targets:
+        target:
           - aarch64-unknown-linux-musl
           - armv5te-unknown-linux-musleabi
           - armv7-unknown-linux-musleabihf
