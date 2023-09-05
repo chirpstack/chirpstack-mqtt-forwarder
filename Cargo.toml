@@ -10,7 +10,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-clap = { version = "4.3", default-features = false, features = [
+clap = { version = "4.4", default-features = false, features = [
     "std",
     "help",
     "usage",
@@ -36,8 +36,8 @@ base64 = "0.21"
 rand = "0.8"
 pbjson-types = "0.5"
 paho-mqtt = { version = "0.12", features = ["ssl", "build_bindgen"] }
-handlebars = "4.3"
-tokio = { version = "1.28", features = [
+handlebars = "4.4"
+tokio = { version = "1.32", features = [
     "macros",
     "rt-multi-thread",
     "net",
