@@ -485,7 +485,7 @@ impl RxPk {
                 let uplink_id = if cfg!(test) { 123 } else { rng.gen::<u32>() };
 
                 let mut pl = pl.clone();
-                let mut rx_info = pl.rx_info.as_mut().unwrap();
+                let rx_info = pl.rx_info.as_mut().unwrap();
                 rx_info.uplink_id = uplink_id;
 
                 rx_info.antenna = rs.ant.into();
