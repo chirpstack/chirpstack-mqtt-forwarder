@@ -49,7 +49,7 @@ package-aarch64-unknown-linux-musl:
 
 	# .deb
 	cargo deb --target aarch64-unknown-linux-musl --no-build --no-strip
-	cp target/aarch64-unknown-linux-musl/debian/*.deb ../dist
+	cp target/aarch64-unknown-linux-musl/debian/*.deb ./dist
 
 package-armv7-unknown-linux-musleabihf: package-tektelic-kona package-kerlink-klkgw
 	$(eval PKG_VERSION := $(shell cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version'))
@@ -60,7 +60,7 @@ package-armv7-unknown-linux-musleabihf: package-tektelic-kona package-kerlink-kl
 
 	# .deb
 	cargo deb --target armv7-unknown-linux-musleabihf --no-build --no-strip
-	cp target/armv7-unknown-linux-musleabihf/debian/*.deb ../dist
+	cp target/armv7-unknown-linux-musleabihf/debian/*.deb ./dist
 
 package-armv5te-unknown-linux-musleabi: package-multitech-conduit package-multitech-conduit-ap
 
