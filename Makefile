@@ -51,7 +51,7 @@ package-aarch64-unknown-linux-musl:
 	cargo deb --target aarch64-unknown-linux-musl --no-build --no-strip
 	cp target/aarch64-unknown-linux-musl/debian/*.deb ./dist
 
-package-armv7-unknown-linux-musleabihf: package-tektelic-kona package-kerlink-klkgw
+package-armv7-unknown-linux-musleabihf: package-tektelic-kona package-kerlink-klkgw package-multitech-conduit-ap3
 	$(eval PKG_VERSION := $(shell cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version'))
 	mkdir -p dist
 
@@ -83,6 +83,11 @@ package-multitech-conduit-ap:
 	cd packaging/vendor/multitech/conduit_ap && ./package.sh
 	mkdir -p dist/vendor/multitech/conduit_ap
 	cp packaging/vendor/multitech/conduit_ap/*.ipk dist/vendor/multitech/conduit_ap
+
+package-multitech-conduit-ap3:
+	cd packaging/vendor/multitech/conduit_ap3 && ./package.sh
+	mkdir -p dist/vendor/multitech/conduit_ap3
+	cp packaging/vendor/multitech/conduit_ap3/*.ipk dist/vendor/multitech/conduit_ap3
 
 package-rak-ramips-24kec:
 	cd packaging/vendor/rak/ramips_24kec && ./package.sh

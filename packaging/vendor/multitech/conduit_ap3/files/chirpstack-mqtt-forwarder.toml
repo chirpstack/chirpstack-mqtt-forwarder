@@ -16,7 +16,7 @@
 
   [backend.concentratord]
     event_url="ipc:///tmp/concentratord_event" 
-	  command_url="ipc:///tmp/concentratord_command"
+    command_url="ipc:///tmp/concentratord_command"
 
   [backend.semtech_udp]
     bind="0.0.0.0:1700"
