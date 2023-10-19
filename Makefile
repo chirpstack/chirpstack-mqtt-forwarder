@@ -66,7 +66,7 @@ package-armv5te-unknown-linux-musleabi: package-multitech-conduit package-multit
 
 package-mips-unknown-linux-musl: package-dragino
 
-package-mipsel-unknown-linux-musl: package-rak-ramips-24kec
+package-mipsel-unknown-linux-musl: package-rak-mipsel_24kc
 
 # Gateway specific packaging.
 package-dragino:
@@ -89,10 +89,10 @@ package-multitech-conduit-ap3:
 	mkdir -p dist/vendor/multitech/conduit_ap3
 	cp packaging/vendor/multitech/conduit_ap3/*.ipk dist/vendor/multitech/conduit_ap3
 
-package-rak-ramips-24kec:
-	cd packaging/vendor/rak/ramips_24kec && ./package.sh
-	mkdir -p dist/vendor/rak/ramips_24kec
-	cp packaging/vendor/rak/ramips_24kec/*.ipk dist/vendor/rak/ramips_24kec
+package-rak-mipsel_24kc:
+	cd packaging/vendor/rak/mipsel_24kc && ./package.sh
+	mkdir -p dist/vendor/rak/mipsel_24kc
+	cp packaging/vendor/rak/mipsel_24kc/*.ipk dist/vendor/rak/mipsel_24kc
 
 package-tektelic-kona:
 	cd packaging/vendor/tektelic/kona && ./package.sh

@@ -19,7 +19,7 @@ mkdir -p $PACKAGE_DIR/CONTROL
 cat > $PACKAGE_DIR/CONTROL/control << EOF
 Package: $PACKAGE_NAME
 Version: $PACKAGE_VERSION-$REV
-Architecture: ramips_24kec
+Architecture: mipsel_24kc
 Maintainer: Orne Brocaar <info@brocaar.com>
 Priority: optional
 Section: network
