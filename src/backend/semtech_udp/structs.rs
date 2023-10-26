@@ -433,7 +433,8 @@ impl RxPk {
             rx_info: Some(gw::UplinkRxInfo {
                 gateway_id: hex::encode(gateway_id),
                 uplink_id,
-                time: match self.time.map(pbjson_types::Timestamp::from) {
+                ns_time: None,
+                gw_time: match self.time.map(pbjson_types::Timestamp::from) {
                     Some(v) => Some(v),
                     None => {
                         if time_fallback_enabled {
@@ -724,12 +725,30 @@ impl PullResp {
                         gw::modulation::Parameters::Fsk(v) => Some(v.frequency_deviation as u16),
                         _ => None,
                     },
-                    ncrc: None,
+                    ncrc: match modulation_params {
+                        gw::modulation::Parameters::Lora(v) => {
+                            if v.no_crc {
+                                Some(v.no_crc)
+                            } else {
+                                None
+                            }
+                        }
+                        _ => None,
+                    },
                     ipol: match modulation_params {
                         gw::modulation::Parameters::Lora(v) => Some(v.polarization_inversion),
                         _ => None,
                     },
-                    prea: None,
+                    prea: match modulation_params {
+                        gw::modulation::Parameters::Lora(v) => {
+                            if v.preamble > 0 {
+                                Some(v.preamble as u16)
+                            } else {
+                                None
+                            }
+                        }
+                        _ => None,
+                    },
                     size: item.phy_payload.len() as u16,
                     data: item.phy_payload.clone(),
                 },
@@ -1140,7 +1159,7 @@ mod test {
                 rx_info: Some(gw::UplinkRxInfo {
                     gateway_id: "0102030405060708".into(),
                     uplink_id: 123,
-                    time: Some(pbjson_types::Timestamp::from(now)),
+                    gw_time: Some(pbjson_types::Timestamp::from(now)),
                     rssi: 120,
                     snr: 3.5,
                     channel: 5,
@@ -1210,7 +1229,7 @@ mod test {
                 rx_info: Some(gw::UplinkRxInfo {
                     gateway_id: "0102030405060708".into(),
                     uplink_id: 123,
-                    time: Some(pbjson_types::Timestamp::from(now)),
+                    gw_time: Some(pbjson_types::Timestamp::from(now)),
                     time_since_gps_epoch: Some(pbjson_types::Duration::from(Duration::from_secs(
                         5
                     ))),
@@ -1283,7 +1302,7 @@ mod test {
                 rx_info: Some(gw::UplinkRxInfo {
                     gateway_id: "0102030405060708".into(),
                     uplink_id: 123,
-                    time: Some(pbjson_types::Timestamp::from(now)),
+                    gw_time: Some(pbjson_types::Timestamp::from(now)),
                     time_since_gps_epoch: Some(pbjson_types::Duration::from(
                         Duration::from_millis(5_100)
                     )),
@@ -1373,7 +1392,7 @@ mod test {
                     rx_info: Some(gw::UplinkRxInfo {
                         gateway_id: "0102030405060708".into(),
                         uplink_id: 123,
-                        time: Some(pbjson_types::Timestamp::from(now)),
+                        gw_time: Some(pbjson_types::Timestamp::from(now)),
                         rssi: 120,
                         snr: 5.4,
                         channel: 5,
@@ -1404,7 +1423,7 @@ mod test {
                     rx_info: Some(gw::UplinkRxInfo {
                         gateway_id: "0102030405060708".into(),
                         uplink_id: 123,
-                        time: Some(pbjson_types::Timestamp::from(now)),
+                        gw_time: Some(pbjson_types::Timestamp::from(now)),
                         rssi: 130,
                         snr: 3.5,
                         channel: 6,
@@ -1471,7 +1490,7 @@ mod test {
                 rx_info: Some(gw::UplinkRxInfo {
                     gateway_id: "0102030405060708".into(),
                     uplink_id: 123,
-                    time: Some(pbjson_types::Timestamp::from(now)),
+                    gw_time: Some(pbjson_types::Timestamp::from(now)),
                     rssi: 120,
                     channel: 5,
                     rf_chain: 1,
@@ -1540,7 +1559,7 @@ mod test {
                 rx_info: Some(gw::UplinkRxInfo {
                     gateway_id: "0102030405060708".into(),
                     uplink_id: 123,
-                    time: Some(pbjson_types::Timestamp::from(now)),
+                    gw_time: Some(pbjson_types::Timestamp::from(now)),
                     rssi: 120,
                     channel: 5,
                     rf_chain: 1,
@@ -1614,7 +1633,7 @@ mod test {
                 rx_info: Some(gw::UplinkRxInfo {
                     gateway_id: "0102030405060708".into(),
                     uplink_id: 123,
-                    time: Some(pbjson_types::Timestamp::from(now)),
+                    gw_time: Some(pbjson_types::Timestamp::from(now)),
                     rssi: 120,
                     snr: 3.5,
                     channel: 5,
@@ -1667,7 +1686,7 @@ mod test {
         };
         let pl = pl.to_proto_uplink_frames(false).unwrap();
         assert_eq!(1, pl.len());
-        assert!(pl[0].rx_info.as_ref().unwrap().time.is_none());
+        assert!(pl[0].rx_info.as_ref().unwrap().gw_time.is_none());
     }
 
     #[test]
@@ -1702,7 +1721,7 @@ mod test {
         };
         let pl = pl.to_proto_uplink_frames(true).unwrap();
         assert_eq!(1, pl.len());
-        assert!(pl[0].rx_info.as_ref().unwrap().time.is_some());
+        assert!(pl[0].rx_info.as_ref().unwrap().gw_time.is_some());
     }
 
     #[test]

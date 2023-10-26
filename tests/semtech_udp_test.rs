@@ -152,7 +152,7 @@ async fn end_to_end() {
             }),
             rx_info: Some(gw::UplinkRxInfo {
                 gateway_id: "0102030405060708".into(),
-                time: Some(pbjson_types::Timestamp::from(ts.clone())),
+                gw_time: Some(pbjson_types::Timestamp::from(ts.clone())),
                 rssi: -35,
                 snr: 5.1,
                 channel: 2,
