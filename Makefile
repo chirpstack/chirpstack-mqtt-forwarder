@@ -1,11 +1,16 @@
 .PHONY: dist
 
 # Compile the binaries for all targets.
-build: build-aarch64-unknown-linux-musl \
+build: \
+	build-x86_64-unknown-linux-musl \
+	build-aarch64-unknown-linux-musl \
 	build-armv5te-unknown-linux-musleabi \
 	build-armv7-unknown-linux-musleabihf \
 	build-mips-unknown-linux-musl \
 	build-mipsel-unknown-linux-musl
+
+build-x86_64-unknown-linux-musl:
+	cross build --target x86_64-unknown-linux-musl --release
 
 build-aarch64-unknown-linux-musl:
 	cross build --target aarch64-unknown-linux-musl --release
@@ -23,11 +28,15 @@ build-mipsel-unknown-linux-musl:
 	cross build --target mipsel-unknown-linux-musl --release --no-default-features --features semtech_udp
 
 # Build distributable binaries for all targets.
-dist: dist-aarch64-unknown-linux-musl \
+dist: \
+	dist-x86_64-unknown-linux-musl \
+	dist-aarch64-unknown-linux-musl \
 	dist-armv5te-unknown-linux-musleabi \
 	dist-armv7-unknown-linux-musleabihf \
 	dist-mips-unknown-linux-musl \
 	dist-mipsel-unknown-linux-musl
+
+dist-x86_64-unknown-linux-musl: build-x86_64-unknown-linux-musl package-x86_64-unknown-linux-musl
 
 dist-aarch64-unknown-linux-musl: build-aarch64-unknown-linux-musl package-aarch64-unknown-linux-musl
 
@@ -40,6 +49,17 @@ dist-mips-unknown-linux-musl: build-mips-unknown-linux-musl package-mips-unknown
 dist-mipsel-unknown-linux-musl: build-mipsel-unknown-linux-musl package-mipsel-unknown-linux-musl
 
 # Package the compiled binaries
+package-x86_64-unknown-linux-musl:
+	$(eval PKG_VERSION := $(shell cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version'))
+	mkdir -p dist
+
+	# .tar.gz
+	tar -czvf dist/chirpstack-mqtt-forwarder_$(PKG_VERSION)_amd64.tar.gz -C target/x86_64-unknown-linux-musl/release chirpstack-mqtt-forwarder
+
+	# .deb
+	cargo deb --target x86_64-unknown-linux-musl --no-build --no-strip
+	cp target/x86_64-unknown-linux-musl/debian/*.deb ./dist
+
 package-aarch64-unknown-linux-musl:
 	$(eval PKG_VERSION := $(shell cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version'))
 	mkdir -p dist
