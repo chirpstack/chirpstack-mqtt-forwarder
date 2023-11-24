@@ -17,4 +17,4 @@ services:
     ports:
       - "1883:1883"
     volumes: 
-      - ./configuration/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - ./.docker-compose/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
