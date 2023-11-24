@@ -49,7 +49,7 @@ pub struct Mqtt {
     pub server: String,
     pub username: String,
     pub password: String,
-    pub qos: usize,
+    pub qos: u8,
     pub clean_session: bool,
     pub client_id: String,
     pub ca_cert: String,

@@ -1,15 +1,17 @@
-use std::env;
-use std::io::Cursor;
+use std::fs::File;
+use std::io::{BufReader, Cursor};
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use chirpstack_api::gw;
-use futures::stream::StreamExt;
 use log::{debug, error, info, trace};
 use once_cell::sync::OnceCell;
-use paho_mqtt as mqtt;
 use prost::Message;
+use rumqttc::tokio_rustls::rustls;
+use rumqttc::v5::mqttbytes::v5::{ConnectReturnCode, LastWill, Publish};
+use rumqttc::v5::{mqttbytes::QoS, AsyncClient, Event, Incoming, MqttOptions};
+use rumqttc::Transport;
 use serde::Serialize;
 use tokio::sync::mpsc;
 use tokio::time::sleep;
@@ -39,8 +41,8 @@ struct StateTopciContext {
 }
 
 struct State {
-    client: mqtt::AsyncClient,
-    qos: usize,
+    client: AsyncClient,
+    qos: QoS,
     json: bool,
     gateway_id: String,
     topic_prefix: String,
@@ -52,6 +54,13 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
     }
 
     debug!("Setting up MQTT client");
+
+    let qos = match conf.mqtt.qos {
+        0 => QoS::AtMostOnce,
+        1 => QoS::AtLeastOnce,
+        2 => QoS::ExactlyOnce,
+        _ => return Err(anyhow!("Invalid QoS: {}", conf.mqtt.qos)),
+    };
 
     // get gateway id
     let gateway_id = get_gateway_id().await?;
@@ -71,9 +80,7 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
     };
 
     // Create connect channel
-    // This is needed as we can't subscribe within the set_connected_callback as this would
-    // block the callback (we want to wait for success or error), which would create a
-    // deadlock. We need to re-subscribe on (re)connect to be sure we have a subscription. Even
+    // We need to re-subscribe on (re)connect to be sure we have a subscription. Even
     // in case of a persistent MQTT session, there is no guarantee that the MQTT persisted the
     // session and that a re-connect would recover the subscription.
     let (connect_tx, mut connect_rx) = mpsc::channel(1);
@@ -89,37 +96,21 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
         false => lwt.encode_to_vec(),
     };
     let lwt_topic = get_state_topic(&topic_prefix, &gateway_id, "conn");
-    let lwt_msg = mqtt::Message::new_retained(lwt_topic, lwt, conf.mqtt.qos as i32);
+    let lwt_msg = LastWill {
+        qos,
+        topic: lwt_topic.into(),
+        message: lwt.into(),
+        retain: true,
+        properties: None,
+    };
 
     // create client
-    let create_opts = mqtt::CreateOptionsBuilder::new()
-        .server_uri(&conf.mqtt.server)
-        .client_id(&client_id)
-        .persistence(env::temp_dir())
-        .finalize();
-
-    let mut client = mqtt::AsyncClient::new(create_opts)?;
-    client.set_connected_callback(move |_| {
-        info!("Connected to MQTT broker");
-
-        if let Err(e) = connect_tx.try_send(()) {
-            error!("Send to subscribe channel error, error: {}", e);
-        }
-    });
-    client.set_connection_lost_callback(|_| {
-        error!("MQTT connection to broker lost");
-    });
-
-    // connection options
-    let mut conn_opts_b = mqtt::ConnectOptionsBuilder::new();
-    conn_opts_b.will_message(lwt_msg);
-    conn_opts_b.automatic_reconnect(Duration::from_secs(1), Duration::from_secs(30));
-    conn_opts_b.clean_session(conf.mqtt.clean_session);
-    if !conf.mqtt.username.is_empty() {
-        conn_opts_b.user_name(&conf.mqtt.username);
-    }
-    if !conf.mqtt.password.is_empty() {
-        conn_opts_b.password(&conf.mqtt.password);
+    let mut mqtt_opts =
+        MqttOptions::parse_url(format!("{}?client_id={}", conf.mqtt.server, client_id))?;
+    mqtt_opts.set_last_will(lwt_msg);
+    mqtt_opts.set_clean_start(conf.mqtt.clean_session);
+    if !conf.mqtt.username.is_empty() || !conf.mqtt.password.is_empty() {
+        mqtt_opts.set_credentials(&conf.mqtt.username, &conf.mqtt.password);
     }
     if !conf.mqtt.ca_cert.is_empty()
         || !conf.mqtt.tls_cert.is_empty()
@@ -130,42 +121,35 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
             conf.mqtt.ca_cert, conf.mqtt.tls_cert, conf.mqtt.tls_key
         );
 
-        let mut ssl_opts_b = mqtt::SslOptionsBuilder::new();
+        let root_certs = get_root_certs(if conf.mqtt.ca_cert.is_empty() {
+            None
+        } else {
+            Some(conf.mqtt.ca_cert.clone())
+        })?;
 
-        if !conf.mqtt.ca_cert.is_empty() {
-            ssl_opts_b.trust_store(&conf.mqtt.ca_cert)?;
-        }
+        let client_conf = if conf.mqtt.tls_cert.is_empty() && conf.mqtt.tls_key.is_empty() {
+            rustls::ClientConfig::builder()
+                .with_safe_defaults()
+                .with_root_certificates(root_certs.clone())
+                .with_no_client_auth()
+        } else {
+            rustls::ClientConfig::builder()
+                .with_safe_defaults()
+                .with_root_certificates(root_certs.clone())
+                .with_client_auth_cert(
+                    load_cert(&conf.mqtt.tls_cert)?,
+                    load_key(&conf.mqtt.tls_key)?,
+                )?
+        };
 
-        if !conf.mqtt.tls_cert.is_empty() {
-            ssl_opts_b.key_store(&conf.mqtt.tls_cert)?;
-        }
-
-        if !conf.mqtt.tls_key.is_empty() {
-            ssl_opts_b.private_key(&conf.mqtt.tls_key)?;
-        }
-
-        conn_opts_b.ssl_options(ssl_opts_b.finalize());
-    }
-    let conn_opts = conn_opts_b.finalize();
-
-    // get message stream
-    let mut stream = client.get_stream(25);
-
-    // connect
-    info!(
-        "Connecting to MQTT broker, server: {}, clean_session: {}, client_id: {}, qos: {}",
-        conf.mqtt.server, conf.mqtt.clean_session, client_id, conf.mqtt.qos,
-    );
-
-    while let Err(e) = client.connect(conn_opts.clone()).await {
-        error!("Connecting to MQTT broker error, error: {}", e);
-        sleep(Duration::from_secs(1)).await;
+        mqtt_opts.set_transport(Transport::tls_with_config(client_conf.into()));
     }
 
+    let (client, mut eventloop) = AsyncClient::new(mqtt_opts, 100);
     let state = State {
         client,
         topic_prefix,
-        qos: conf.mqtt.qos,
+        qos,
         json: conf.mqtt.json,
         gateway_id: gateway_id.clone(),
     };
@@ -190,31 +174,54 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
         async move {
             while connect_rx.recv().await.is_some() {
                 info!("Subscribing to command topic, topic: {}", command_topic);
-                if let Err(e) = state
-                    .client
-                    .subscribe(&command_topic, state.qos as i32)
-                    .await
-                {
+                if let Err(e) = state.client.subscribe(&command_topic, state.qos).await {
                     error!("Subscribing to command topic error, error: {}", e);
                 }
 
                 info!("Sending conn state, topic: {}", state_topic);
-                let msg = mqtt::Message::new_retained(&state_topic, b.clone(), state.qos as i32);
-                if let Err(e) = state.client.publish(msg).await {
+                if let Err(e) = state
+                    .client
+                    .publish(&state_topic, state.qos, true, b.clone())
+                    .await
+                {
                     error!("Sending state error: {}", e);
                 }
             }
         }
     });
 
-    // Consume loop
+    // Eventloop
     tokio::spawn({
         async move {
-            info!("Starting MQTT consumer loop");
-            while let Some(msg_opt) = stream.next().await {
-                if let Some(msg) = msg_opt {
-                    if let Err(e) = message_callback(msg).await {
-                        error!("Handling message error, error: {}", e);
+            info!("Starting MQTT event loop");
+
+            loop {
+                match eventloop.poll().await {
+                    Ok(v) => {
+                        trace!("MQTT event: {:?}", v);
+
+                        match v {
+                            Event::Incoming(Incoming::Publish(p)) => {
+                                if let Err(e) = message_callback(p).await {
+                                    error!("Handling message error, error: {}", e);
+                                }
+                            }
+                            Event::Incoming(Incoming::ConnAck(v)) => {
+                                if v.code == ConnectReturnCode::Success {
+                                    if let Err(e) = connect_tx.try_send(()) {
+                                        error!("Send to subscribe channel error, error: {}", e);
+                                    }
+                                } else {
+                                    error!("Connection error, code: {:?}", v.code);
+                                    sleep(Duration::from_secs(1)).await
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    Err(e) => {
+                        error!("MQTT error, error: {}", e);
+                        sleep(Duration::from_secs(1)).await
                     }
                 }
             }
@@ -240,10 +247,9 @@ pub async fn send_uplink_frame(pl: &gw::UplinkFrame) -> Result<()> {
         pl.rx_info.as_ref().map(|v| v.uplink_id).unwrap_or_default(),
         topic
     );
-    let msg = mqtt::Message::new(topic, b, state.qos as i32);
-    state.client.publish(msg).await?;
 
-    trace!("Message sent");
+    state.client.publish(topic, state.qos, false, b).await?;
+    trace!("Message published");
 
     Ok(())
 }
@@ -258,10 +264,8 @@ pub async fn send_gateway_stats(pl: &gw::GatewayStats) -> Result<()> {
     let topic = get_event_topic(&state.topic_prefix, &state.gateway_id, "stats");
 
     info!("Sending gateway stats event, topic: {}", topic);
-    let msg = mqtt::Message::new(topic, b, state.qos as i32);
-    state.client.publish(msg).await?;
-
-    trace!("Message sent");
+    state.client.publish(topic, state.qos, false, b).await?;
+    trace!("Message published");
 
     Ok(())
 }
@@ -279,22 +283,21 @@ pub async fn send_tx_ack(pl: &gw::DownlinkTxAck) -> Result<()> {
         "Sending ack event, downlink_id: {}, topic: {}",
         pl.downlink_id, topic
     );
-    let msg = mqtt::Message::new(topic, b, state.qos as i32);
-    state.client.publish(msg).await?;
 
-    trace!("Message sent");
+    state.client.publish(topic, state.qos, false, b).await?;
+    trace!("Message published");
 
     Ok(())
 }
 
-async fn message_callback(msg: mqtt::Message) -> Result<()> {
+async fn message_callback(p: Publish) -> Result<()> {
     let state = STATE.get().ok_or_else(|| anyhow!("STATE is not set"))?;
 
-    let topic = msg.topic();
-    let qos = msg.qos();
-    let b = msg.payload();
+    let topic = String::from_utf8(p.topic.to_vec())?;
+    let qos = p.qos;
+    let b = p.payload.to_vec();
 
-    info!("Received message, topic: {}, qos: {}", topic, qos);
+    info!("Received message, topic: {}, qos: {:?}", topic, qos);
 
     let parts: Vec<&str> = topic.split('/').collect();
     if parts.len() < 4 {
@@ -308,7 +311,7 @@ async fn message_callback(msg: mqtt::Message) -> Result<()> {
     match command {
         "down" => {
             let pl = match state.json {
-                true => serde_json::from_slice(b)?,
+                true => serde_json::from_slice(&b)?,
                 false => gw::DownlinkFrame::decode(&mut Cursor::new(b))?,
             };
             if pl.gateway_id != gateway_id {
@@ -324,7 +327,7 @@ async fn message_callback(msg: mqtt::Message) -> Result<()> {
         }
         "config" => {
             let pl = match state.json {
-                true => serde_json::from_slice(b)?,
+                true => serde_json::from_slice(&b)?,
                 false => gw::GatewayConfiguration::decode(&mut Cursor::new(b))?,
             };
             if pl.gateway_id != gateway_id {
@@ -340,7 +343,7 @@ async fn message_callback(msg: mqtt::Message) -> Result<()> {
         }
         "exec" => {
             let pl = match state.json {
-                true => serde_json::from_slice(b)?,
+                true => serde_json::from_slice(&b)?,
                 false => gw::GatewayCommandExecRequest::decode(&mut Cursor::new(b))?,
             };
             if pl.gateway_id != gateway_id {
@@ -354,7 +357,7 @@ async fn message_callback(msg: mqtt::Message) -> Result<()> {
             );
             handle_command_exec(&pl).await
         }
-        _ => Err(anyhow!("Unexepcted command, command: {}", command)),
+        _ => Err(anyhow!("Unexpected command, command: {}", command)),
     }
 }
 
@@ -382,10 +385,9 @@ async fn handle_command_exec(pl: &gw::GatewayCommandExecRequest) -> Result<()> {
         "Sending gateway command exec event, exec_id: {}, topic: {}",
         pl.exec_id, topic
     );
-    let msg = mqtt::Message::new(topic, b, state.qos as i32);
-    state.client.publish(msg).await?;
+    state.client.publish(topic, state.qos, false, b).await?;
 
-    trace!("Message sent");
+    trace!("Message published");
 
     Ok(())
 }
@@ -400,4 +402,48 @@ fn get_event_topic(prefix: &str, gateway_id: &str, event: &str) -> String {
 
 fn get_command_topic(prefix: &str, gateway_id: &str, command: &str) -> String {
     format!("{}gateway/{}/command/{}", prefix, gateway_id, command)
+}
+
+fn get_root_certs(ca_file: Option<String>) -> Result<rustls::RootCertStore> {
+    let mut roots = rustls::RootCertStore::empty();
+    let certs = rustls_native_certs::load_native_certs()?;
+    let certs: Vec<_> = certs.into_iter().map(|cert| cert.0).collect();
+    roots.add_parsable_certificates(&certs);
+
+    if let Some(ca_file) = &ca_file {
+        let f = File::open(ca_file).context("Open CA certificate")?;
+        let mut reader = BufReader::new(f);
+        let certs = rustls_pemfile::certs(&mut reader)?;
+        for cert in certs
+            .into_iter()
+            .map(rustls::Certificate)
+            .collect::<Vec<_>>()
+        {
+            roots.add(&cert)?;
+        }
+    }
+
+    Ok(roots)
+}
+
+fn load_cert(cert_file: &str) -> Result<Vec<rustls::Certificate>> {
+    let f = File::open(cert_file).context("Open TLS certificate")?;
+    let mut reader = BufReader::new(f);
+    let certs = rustls_pemfile::certs(&mut reader)?;
+    let certs = certs
+        .into_iter()
+        .map(rustls::Certificate)
+        .collect::<Vec<_>>();
+    Ok(certs)
+}
+
+fn load_key(key_file: &str) -> Result<rustls::PrivateKey> {
+    let f = File::open(key_file).context("Open private key")?;
+    let mut reader = BufReader::new(f);
+    let mut keys = rustls_pemfile::pkcs8_private_keys(&mut reader)?;
+    match keys.len() {
+        0 => Err(anyhow!("No private key found")),
+        1 => Ok(rustls::PrivateKey(keys.remove(0))),
+        _ => Err(anyhow!("More than one private key found")),
+    }
 }

@@ -3,10 +3,10 @@ use std::io::Cursor;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
-use futures::StreamExt;
-use paho_mqtt as mqtt;
 use prost::Message;
+use rumqttc::v5::{mqttbytes::QoS, AsyncClient, Event, Incoming, MqttOptions};
 use tokio::net::UdpSocket;
+use tokio::sync::mpsc;
 use tokio::time::sleep;
 
 use chirpstack_api::{common, gw};
@@ -44,29 +44,45 @@ async fn end_to_end() {
     socket.connect("0.0.0.0:1700").await.unwrap();
 
     // MQTT
-    let create_opts = mqtt::CreateOptionsBuilder::new()
-        .server_uri(env::var("TEST_MQTT_BROKER_URL").unwrap())
-        .persistence(None)
-        .finalize();
-    let mut client = mqtt::AsyncClient::new(create_opts).unwrap();
-    let mut stream = client.get_stream(25);
-    let conn_opts = mqtt::ConnectOptionsBuilder::new()
-        .clean_session(true)
-        .finalize();
-    client.connect(conn_opts).await.unwrap();
+    let mut mqtt_opts = MqttOptions::parse_url(format!(
+        "{}?client_id=test",
+        env::var("TEST_MQTT_BROKER_URL").unwrap()
+    ))
+    .unwrap();
+    mqtt_opts.set_clean_start(true);
+    let (client, mut eventloop) = AsyncClient::new(mqtt_opts, 100);
+    let (mqtt_tx, mut mqtt_rx) = mpsc::channel(100);
+
+    tokio::spawn({
+        async move {
+            loop {
+                match eventloop.poll().await {
+                    Ok(v) => match v {
+                        Event::Incoming(Incoming::Publish(p)) => mqtt_tx.send(p).await.unwrap(),
+                        _ => {}
+                    },
+                    Err(_) => {}
+                }
+            }
+        }
+    });
+
     client
-        .subscribe("eu868/gateway/0102030405060708/event/+", 0)
+        .subscribe("eu868/gateway/0102030405060708/event/+", QoS::AtLeastOnce)
         .await
         .unwrap();
     client
-        .subscribe("eu868/gateway/0102030405060708/state/+", 0)
+        .subscribe("eu868/gateway/0102030405060708/state/+", QoS::AtLeastOnce)
         .await
         .unwrap();
 
-    sleep(Duration::from_millis(200)).await;
-
-    for _ in 0..stream.len() {
-        stream.next().await.unwrap().unwrap();
+    // Sleep some time to receive message from MQTT broker.
+    // Drain the channel.
+    sleep(Duration::from_millis(100)).await;
+    loop {
+        if mqtt_rx.try_recv().is_err() {
+            break;
+        }
     }
 
     chirpstack_mqtt_forwarder::metadata::setup(&c).unwrap();
@@ -84,12 +100,12 @@ async fn end_to_end() {
     assert_eq!(&[2, 0, 1, 4], &buffer[..size]);
 
     // MQTT conn state
-    let mqtt_msg = stream.next().await.unwrap().unwrap();
+    let mqtt_msg = mqtt_rx.recv().await.unwrap();
     assert_eq!(
         "eu868/gateway/0102030405060708/state/conn",
-        mqtt_msg.topic()
+        String::from_utf8(mqtt_msg.topic.to_vec()).unwrap()
     );
-    let pl = gw::ConnState::decode(&mut Cursor::new(mqtt_msg.payload())).unwrap();
+    let pl = gw::ConnState::decode(&mut Cursor::new(mqtt_msg.payload.to_vec())).unwrap();
     assert_eq!(
         gw::ConnState {
             gateway_id: "0102030405060708".into(),
@@ -131,9 +147,12 @@ async fn end_to_end() {
     assert_eq!(&[2, 0, 1, 1], &buffer[..size]);
 
     // MQTT up event
-    let mqtt_msg = stream.next().await.unwrap().unwrap();
-    assert_eq!("eu868/gateway/0102030405060708/event/up", mqtt_msg.topic());
-    let mut pl = gw::UplinkFrame::decode(&mut Cursor::new(mqtt_msg.payload())).unwrap();
+    let mqtt_msg = mqtt_rx.recv().await.unwrap();
+    assert_eq!(
+        "eu868/gateway/0102030405060708/event/up",
+        String::from_utf8(mqtt_msg.topic.to_vec()).unwrap()
+    );
+    let mut pl = gw::UplinkFrame::decode(&mut Cursor::new(mqtt_msg.payload.to_vec())).unwrap();
     assert_ne!(0, pl.rx_info.as_ref().unwrap().uplink_id);
     pl.rx_info.as_mut().unwrap().uplink_id = 0;
     assert_eq!(
@@ -195,12 +214,16 @@ async fn end_to_end() {
         }],
         ..Default::default()
     };
-    let msg = mqtt::Message::new(
-        "eu868/gateway/0102030405060708/command/down",
-        pl.encode_to_vec(),
-        0,
-    );
-    client.publish(msg).await.unwrap();
+
+    client
+        .publish(
+            "eu868/gateway/0102030405060708/command/down",
+            QoS::AtLeastOnce,
+            false,
+            pl.encode_to_vec(),
+        )
+        .await
+        .unwrap();
 
     // PULL_RESP
     let size = socket.recv(&mut buffer).await.unwrap();
@@ -215,9 +238,12 @@ async fn end_to_end() {
         .unwrap();
 
     // MQTT ack event
-    let mqtt_msg = stream.next().await.unwrap().unwrap();
-    assert_eq!("eu868/gateway/0102030405060708/event/ack", mqtt_msg.topic());
-    let pl = gw::DownlinkTxAck::decode(&mut Cursor::new(mqtt_msg.payload())).unwrap();
+    let mqtt_msg = mqtt_rx.recv().await.unwrap();
+    assert_eq!(
+        "eu868/gateway/0102030405060708/event/ack",
+        String::from_utf8(mqtt_msg.topic.to_vec()).unwrap()
+    );
+    let pl = gw::DownlinkTxAck::decode(&mut Cursor::new(mqtt_msg.payload.to_vec())).unwrap();
     assert_eq!(
         gw::DownlinkTxAck {
             gateway_id: "0102030405060708".into(),
@@ -254,12 +280,12 @@ async fn end_to_end() {
     assert_eq!(&[2, 0, 1, 1], &buffer[..size]);
 
     // MQTT stats event
-    let mqtt_msg = stream.next().await.unwrap().unwrap();
+    let mqtt_msg = mqtt_rx.recv().await.unwrap();
     assert_eq!(
         "eu868/gateway/0102030405060708/event/stats",
-        mqtt_msg.topic()
+        String::from_utf8(mqtt_msg.topic.to_vec()).unwrap()
     );
-    let pl = gw::GatewayStats::decode(&mut Cursor::new(mqtt_msg.payload())).unwrap();
+    let pl = gw::GatewayStats::decode(&mut Cursor::new(mqtt_msg.payload.to_vec())).unwrap();
     assert_eq!(
         gw::GatewayStats {
             gateway_id: "0102030405060708".into(),

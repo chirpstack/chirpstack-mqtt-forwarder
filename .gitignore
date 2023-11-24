@@ -4,6 +4,7 @@
 !.github
 !.vscode
 !.env
+!.docker-compose/
 
 # Config files
 /chirpstack-mqtt-forwarder.toml
