@@ -168,7 +168,24 @@ async fn end_to_end() {
         String::from_utf8(mqtt_msg.topic.to_vec()).unwrap()
     );
     let pl = gw::GatewayStats::decode(&mut Cursor::new(mqtt_msg.payload.to_vec())).unwrap();
-    assert_eq!(stats_pl, pl);
+    assert_eq!(
+        gw::GatewayStats {
+            gateway_id: "0102030405060708".into(),
+            metadata: [
+                (
+                    "mqtt_forwarder_version".to_string(),
+                    env!("CARGO_PKG_VERSION").to_string()
+                ),
+                ("foo".to_string(), "bar".to_string()),
+                ("hello".to_string(), "hello world".to_string()),
+            ]
+            .iter()
+            .cloned()
+            .collect(),
+            ..Default::default()
+        },
+        pl
+    );
 
     // Downlink
     let down_pl = gw::DownlinkFrame {

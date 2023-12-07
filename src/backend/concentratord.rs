@@ -10,6 +10,7 @@ use tokio::task;
 
 use super::Backend as BackendTrait;
 use crate::config::Configuration;
+use crate::metadata;
 use crate::mqtt::{send_gateway_stats, send_tx_ack, send_uplink_frame};
 
 pub struct Backend {
@@ -257,8 +258,9 @@ async fn handle_event_msg(
             }
         }
         "stats" => {
-            let pl = gw::GatewayStats::decode(pl)?;
+            let mut pl = gw::GatewayStats::decode(pl)?;
             info!("Received gateway stats");
+            pl.metadata.extend(metadata::get().await?);
             send_gateway_stats(&pl).await?;
         }
         _ => {
