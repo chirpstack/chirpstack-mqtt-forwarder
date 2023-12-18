@@ -127,7 +127,7 @@ package-kerlink-klkgw:
 # Update the version.
 version:
 	test -n "$(VERSION)"
-	sed -i 's/^version.*/version = "$(VERSION)"/g' ./Cargo.toml
+	sed -i 's/^  version.*/  version = "$(VERSION)"/g' ./Cargo.toml
 	make test
 	git add .
 	git commit -v -m "Bump version to $(VERSION)"
