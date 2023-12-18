@@ -1,10 +1,12 @@
 use std::io::Cursor;
 use std::sync::{Arc, Mutex};
+use std::thread::sleep;
+use std::time::Duration;
 
 use anyhow::Result;
 use async_trait::async_trait;
 use chirpstack_api::gw;
-use log::{debug, error, info, trace};
+use log::{debug, error, info, trace, warn};
 use prost::Message;
 use tokio::task;
 
@@ -15,6 +17,8 @@ use crate::mqtt::{send_gateway_stats, send_tx_ack, send_uplink_frame};
 
 pub struct Backend {
     gateway_id: String,
+    ctx: zmq::Context,
+    cmd_url: String,
     cmd_sock: Mutex<zmq::Socket>,
 }
 
@@ -79,8 +83,60 @@ impl Backend {
 
         Ok(Backend {
             gateway_id,
+            ctx: zmq_ctx,
+            cmd_url: conf.backend.concentratord.command_url.clone(),
             cmd_sock: Mutex::new(cmd_sock),
         })
+    }
+
+    fn send_command(&self, cmd: &str, b: &[u8]) -> Result<Vec<u8>> {
+        let res = || -> Result<Vec<u8>> {
+            let cmd_sock = self.cmd_sock.lock().unwrap();
+            cmd_sock.send(cmd, zmq::SNDMORE)?;
+            cmd_sock.send(b, 0)?;
+
+            // set poller so that we can timeout after 100ms
+            let mut items = [cmd_sock.as_poll_item(zmq::POLLIN)];
+            zmq::poll(&mut items, 100)?;
+            if !items[0].is_readable() {
+                return Err(anyhow!("Could not read down response"));
+            }
+
+            // red tx ack response
+            let resp_b: &[u8] = &cmd_sock.recv_bytes(0)?;
+            Ok(resp_b.to_vec())
+        }();
+
+        if res.is_err() {
+            loop {
+                // Reconnect the CMD socket in case we received an error.
+                // In case there was an issue with receiving data from the socket, it could mean
+                // it is in a 'dirty' state. E.g. due to the error we did not read the full
+                // response.
+                if let Err(e) = self.reconnect_cmd_sock() {
+                    error!(
+                        "Re-connecting to Concentratord command API error, error: {}",
+                        e
+                    );
+                    sleep(Duration::from_secs(1));
+                    continue;
+                }
+
+                break;
+            }
+        }
+
+        res
+    }
+
+    fn reconnect_cmd_sock(&self) -> Result<()> {
+        warn!(
+            "Re-connecting to Concentratord command API, command_url: {}",
+            self.cmd_url
+        );
+        let cmd_sock = self.ctx.socket(zmq::REQ)?;
+        cmd_sock.connect(&self.cmd_url)?;
+        Ok(())
     }
 }
 
@@ -94,23 +150,8 @@ impl BackendTrait for Backend {
         info!("Sending downlink frame, downlink_id: {}", pl.downlink_id);
 
         let tx_ack = {
-            let cmd_sock = self.cmd_sock.lock().unwrap();
-
             let b = pl.encode_to_vec();
-
-            // send 'down' command with payload
-            cmd_sock.send("down", zmq::SNDMORE)?;
-            cmd_sock.send(b, 0)?;
-
-            // set poller so that we can timeout after 100ms
-            let mut items = [cmd_sock.as_poll_item(zmq::POLLIN)];
-            zmq::poll(&mut items, 100)?;
-            if !items[0].is_readable() {
-                return Err(anyhow!("Could not read down response"));
-            }
-
-            // red tx ack response
-            let resp_b: &[u8] = &cmd_sock.recv_bytes(0)?;
+            let resp_b = self.send_command("down", &b)?;
             gw::DownlinkTxAck::decode(&mut Cursor::new(resp_b))?
         };
 
@@ -131,22 +172,8 @@ impl BackendTrait for Backend {
     async fn send_configuration_command(&self, pl: &gw::GatewayConfiguration) -> Result<()> {
         info!("Sending configuration command, version: {}", pl.version);
 
-        let cmd_sock = self.cmd_sock.lock().unwrap();
         let b = pl.encode_to_vec();
-
-        // send 'config' command with payload
-        cmd_sock.send("config", zmq::SNDMORE)?;
-        cmd_sock.send(b, 0)?;
-
-        // set poller so that we can timeout after 100ms
-        let mut items = [cmd_sock.as_poll_item(zmq::POLLIN)];
-        zmq::poll(&mut items, 100)?;
-        if !items[0].is_readable() {
-            return Err(anyhow!("Could not read down response"));
-        }
-
-        // read response
-        let _: &[u8] = &cmd_sock.recv_bytes(0)?;
+        let _ = self.send_command("config", &b)?;
 
         Ok(())
     }
