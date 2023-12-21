@@ -1105,10 +1105,10 @@ checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
 [[package]]
 name = "ring"
 version = "0.17.7"
-source = "git+https://github.com/brocaar/ring.git?branch=add_mips_support#9467d8cd6ac9a6ac7acf4c1056b8cd2390755292"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "688c63d65483050968b2a8937f7995f443e27041a0f7700aa59b0822aedebb74"
 dependencies = [
  "cc",
- "cfg-if",
  "getrandom",
  "libc",
  "spin",

@@ -80,14 +80,7 @@
 
 [profile.release]
   strip = true
-  # Try to revert back to z after ring update.
-  # opt-level = "z"
-  opt-level = 3
+  opt-level = "z"
   lto = true
   codegen-units = 1
   panic = "abort"
-
-[patch.crates-io]
-  # Remove once https://github.com/briansmith/ring/pull/1859 has been merged and
-  # released.
-  ring = { git = "https://github.com/brocaar/ring.git", branch = "add_mips_support" }
