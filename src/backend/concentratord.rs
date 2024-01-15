@@ -134,7 +134,8 @@ impl Backend {
             "Re-connecting to Concentratord command API, command_url: {}",
             self.cmd_url
         );
-        let cmd_sock = self.ctx.socket(zmq::REQ)?;
+        let mut cmd_sock = self.cmd_sock.lock().unwrap();
+        *cmd_sock = self.ctx.socket(zmq::REQ)?;
         cmd_sock.connect(&self.cmd_url)?;
         Ok(())
     }
