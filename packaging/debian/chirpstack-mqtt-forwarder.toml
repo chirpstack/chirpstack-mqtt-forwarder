@@ -9,7 +9,7 @@
   enabled="semtech_udp" 
 
   [backend.semtech_udp]
-    udp_bind="0.0.0.0:1700"
+    bind="0.0.0.0:1700"
 
 [mqtt]
   topic_prefix="eu868"
