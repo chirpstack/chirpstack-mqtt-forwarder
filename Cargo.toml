@@ -10,7 +10,7 @@
   publish = false
 
 [dependencies]
-  clap = { version = "4.4", default-features = false, features = [
+  clap = { version = "4.5", default-features = false, features = [
     "std",
     "help",
     "usage",
@@ -23,7 +23,7 @@
   serde_json = "1.0"
   serde = { version = "1.0", features = ["derive"] }
   log = "0.4"
-  simple_logger = "4.2"
+  simple_logger = "4.3"
   syslog = "6.1"
   prost = "0.12"
   anyhow = "1.0"
@@ -36,10 +36,10 @@
   rand = "0.8"
   pbjson-types = "0.6"
   rumqttc = { version = "0.23", features = ["url"] }
-  rustls-native-certs = "0.6"
-  rustls-pemfile = "1.0"
-  handlebars = "4.5"
-  tokio = { version = "1.35", features = [
+  rustls-native-certs = "0.6, < 0.7"
+  rustls-pemfile = "1.0, < 1.1"
+  handlebars = "5.1"
+  tokio = { version = "1.36", features = [
     "macros",
     "rt-multi-thread",
     "net",
