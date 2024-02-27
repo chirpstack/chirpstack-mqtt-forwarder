@@ -447,10 +447,8 @@ fn get_root_certs(ca_file: Option<String>) -> Result<rustls::RootCertStore> {
         let f = File::open(ca_file).context("Open CA certificate")?;
         let mut reader = BufReader::new(f);
         let certs = rustls_pemfile::certs(&mut reader);
-        for cert in certs {
-            if let Ok(cert) = cert {
-                roots.add(cert)?;
-            }
+        for cert in certs.flatten() {
+            roots.add(cert)?;
         }
     }
 
@@ -471,8 +469,8 @@ fn load_cert(cert_file: &str) -> Result<Vec<CertificateDer<'static>>> {
 fn load_key(key_file: &str) -> Result<PrivateKeyDer<'static>> {
     let f = File::open(key_file).context("Open private key")?;
     let mut reader = BufReader::new(f);
-    let keys = rustls_pemfile::pkcs8_private_keys(&mut reader);
-    for key in keys {
+    let mut keys = rustls_pemfile::pkcs8_private_keys(&mut reader);
+    if let Some(key) = keys.next() {
         match key {
             Ok(v) => return Ok(PrivateKeyDer::Pkcs8(v.clone_key())),
             Err(e) => {
