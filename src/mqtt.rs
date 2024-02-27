@@ -12,6 +12,7 @@ use rumqttc::tokio_rustls::rustls;
 use rumqttc::v5::mqttbytes::v5::{ConnectReturnCode, LastWill, Publish};
 use rumqttc::v5::{mqttbytes::QoS, AsyncClient, Event, Incoming, MqttOptions};
 use rumqttc::Transport;
+use rustls_pki_types::{CertificateDer, PrivateKeyDer};
 use serde::Serialize;
 use tokio::sync::mpsc;
 use tokio::time::sleep;
@@ -105,8 +106,39 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
     };
 
     // create client
-    let mut mqtt_opts =
-        MqttOptions::parse_url(format!("{}?client_id={}", conf.mqtt.server, client_id))?;
+    // workaround for:
+    // https://github.com/bytebeamio/rumqtt/issues/808
+    let mqtt_url = url::Url::parse(&conf.mqtt.server)?;
+    let mut mqtt_opts = match mqtt_url.scheme() {
+        "mqtt" | "tcp" => MqttOptions::new(
+            client_id,
+            mqtt_url.host_str().unwrap_or_default(),
+            mqtt_url.port().unwrap_or(1883),
+        ),
+        "mqtts" | "ssl" => {
+            let mut m = MqttOptions::new(
+                client_id,
+                mqtt_url.host_str().unwrap_or_default(),
+                mqtt_url.port().unwrap_or(8883),
+            );
+            m.set_transport(Transport::tls_with_default_config());
+            m
+        }
+        "ws" => {
+            let mut m =
+                MqttOptions::new(client_id, &conf.mqtt.server, mqtt_url.port().unwrap_or(80));
+            m.set_transport(Transport::ws());
+            m
+        }
+        "wss" => {
+            let mut m =
+                MqttOptions::new(client_id, &conf.mqtt.server, mqtt_url.port().unwrap_or(443));
+            m.set_transport(Transport::wss_with_default_config());
+            m
+        }
+        _ => return Err(anyhow!("Invalid scheme: {}", mqtt_url.scheme())),
+    };
+
     mqtt_opts.set_last_will(lwt_msg);
     mqtt_opts.set_clean_start(conf.mqtt.clean_session);
     if !conf.mqtt.username.is_empty() || !conf.mqtt.password.is_empty() {
@@ -129,12 +161,10 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
 
         let client_conf = if conf.mqtt.tls_cert.is_empty() && conf.mqtt.tls_key.is_empty() {
             rustls::ClientConfig::builder()
-                .with_safe_defaults()
                 .with_root_certificates(root_certs.clone())
                 .with_no_client_auth()
         } else {
             rustls::ClientConfig::builder()
-                .with_safe_defaults()
                 .with_root_certificates(root_certs.clone())
                 .with_client_auth_cert(
                     load_cert(&conf.mqtt.tls_cert)?,
@@ -142,7 +172,11 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
                 )?
         };
 
-        mqtt_opts.set_transport(Transport::tls_with_config(client_conf.into()));
+        mqtt_opts.set_transport(match mqtt_opts.transport() {
+            Transport::Tls(_) => Transport::tls_with_config(client_conf.into()),
+            Transport::Wss(_) => Transport::wss_with_config(client_conf.into()),
+            _ => return Err(anyhow!("Configured transport does not allow TLS config")),
+        });
     }
 
     let (client, mut eventloop) = AsyncClient::new(mqtt_opts, 100);
@@ -407,43 +441,45 @@ fn get_command_topic(prefix: &str, gateway_id: &str, command: &str) -> String {
 fn get_root_certs(ca_file: Option<String>) -> Result<rustls::RootCertStore> {
     let mut roots = rustls::RootCertStore::empty();
     let certs = rustls_native_certs::load_native_certs()?;
-    let certs: Vec<_> = certs.into_iter().map(|cert| cert.0).collect();
-    roots.add_parsable_certificates(&certs);
+    roots.add_parsable_certificates(certs);
 
     if let Some(ca_file) = &ca_file {
         let f = File::open(ca_file).context("Open CA certificate")?;
         let mut reader = BufReader::new(f);
-        let certs = rustls_pemfile::certs(&mut reader)?;
-        for cert in certs
-            .into_iter()
-            .map(rustls::Certificate)
-            .collect::<Vec<_>>()
-        {
-            roots.add(&cert)?;
+        let certs = rustls_pemfile::certs(&mut reader);
+        for cert in certs {
+            if let Ok(cert) = cert {
+                roots.add(cert)?;
+            }
         }
     }
 
     Ok(roots)
 }
 
-fn load_cert(cert_file: &str) -> Result<Vec<rustls::Certificate>> {
+fn load_cert(cert_file: &str) -> Result<Vec<CertificateDer<'static>>> {
     let f = File::open(cert_file).context("Open TLS certificate")?;
     let mut reader = BufReader::new(f);
-    let certs = rustls_pemfile::certs(&mut reader)?;
-    let certs = certs
-        .into_iter()
-        .map(rustls::Certificate)
-        .collect::<Vec<_>>();
-    Ok(certs)
+    let certs = rustls_pemfile::certs(&mut reader);
+    let mut out = Vec::new();
+    for cert in certs {
+        out.push(cert?.into_owned());
+    }
+    Ok(out)
 }
 
-fn load_key(key_file: &str) -> Result<rustls::PrivateKey> {
+fn load_key(key_file: &str) -> Result<PrivateKeyDer<'static>> {
     let f = File::open(key_file).context("Open private key")?;
     let mut reader = BufReader::new(f);
-    let mut keys = rustls_pemfile::pkcs8_private_keys(&mut reader)?;
-    match keys.len() {
-        0 => Err(anyhow!("No private key found")),
-        1 => Ok(rustls::PrivateKey(keys.remove(0))),
-        _ => Err(anyhow!("More than one private key found")),
+    let keys = rustls_pemfile::pkcs8_private_keys(&mut reader);
+    for key in keys {
+        match key {
+            Ok(v) => return Ok(PrivateKeyDer::Pkcs8(v.clone_key())),
+            Err(e) => {
+                return Err(anyhow!("Error parsing private key, error: {}", e));
+            }
+        }
     }
+
+    Err(anyhow!("No private key found"))
 }

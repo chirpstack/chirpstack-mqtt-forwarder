@@ -35,9 +35,14 @@
   base64 = "0.21"
   rand = "0.8"
   pbjson-types = "0.6"
-  rumqttc = { version = "0.23", features = ["url"] }
-  rustls-native-certs = "0.6, < 0.7"
-  rustls-pemfile = "1.0, < 1.1"
+  rumqttc = { version =  "0.24", features = [
+    "url",
+    "websocket",
+  ] }
+  url = "2.5"
+  rustls-native-certs = "0.7"
+  rustls-pemfile = "2.1"
+  rustls-pki-types = "1.3"
   handlebars = "5.1"
   tokio = { version = "1.36", features = [
     "macros",
