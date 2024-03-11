@@ -22,14 +22,10 @@ build-armv7-unknown-linux-musleabihf:
 	cross build --target armv7-unknown-linux-musleabihf --release
 
 build-mips-unknown-linux-musl:
-	# mips is a tier-3 target.
-	rustup +nightly component add rust-src
-	cross +nightly build -Z build-std=panic_abort,std --target mips-unknown-linux-musl --release --no-default-features --features semtech_udp
+	cross build --target mips-unknown-linux-musl --release --no-default-features --features semtech_udp
 
 build-mipsel-unknown-linux-musl:
-	# mipsel is a tier-3 target.
-	rustup +nightly component add rust-src
-	cross +nightly build -Z build-std=panic_abort,std --target mipsel-unknown-linux-musl --release --no-default-features --features semtech_udp
+	cross build --target mipsel-unknown-linux-musl --release --no-default-features --features semtech_udp
 
 # Build distributable binaries for all targets.
 dist: \
