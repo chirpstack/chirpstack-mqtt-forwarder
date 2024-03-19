@@ -141,6 +141,7 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
 
     mqtt_opts.set_last_will(lwt_msg);
     mqtt_opts.set_clean_start(conf.mqtt.clean_session);
+    mqtt_opts.set_keep_alive(conf.mqtt.keep_alive_interval);
     if !conf.mqtt.username.is_empty() || !conf.mqtt.password.is_empty() {
         mqtt_opts.set_credentials(&conf.mqtt.username, &conf.mqtt.password);
     }

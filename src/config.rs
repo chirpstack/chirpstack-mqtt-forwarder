@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
+use std::time::Duration;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -52,6 +53,8 @@ pub struct Mqtt {
     pub qos: u8,
     pub clean_session: bool,
     pub client_id: String,
+    #[serde(with = "humantime_serde")]
+    pub keep_alive_interval: Duration,
     pub ca_cert: String,
     pub tls_cert: String,
     pub tls_key: String,
@@ -68,6 +71,7 @@ impl Default for Mqtt {
             qos: 0,
             clean_session: false,
             client_id: "".into(),
+            keep_alive_interval: Duration::from_secs(30),
             ca_cert: "".into(),
             tls_cert: "".into(),
             tls_key: "".into(),
