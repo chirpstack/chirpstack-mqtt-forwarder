@@ -16,10 +16,10 @@
     "usage",
     "derive",
   ] }
-  chirpstack_api = { version = "4.6", default-features = false, features = [
+  chirpstack_api = { version = "4.7", default-features = false, features = [
     "json",
   ] }
-  lrwn_filters = { version = "4.6", features = ["serde"] }
+  lrwn_filters = { version = "4.7", features = ["serde"] }
   serde_json = "1.0"
   serde = { version = "1.0", features = ["derive"] }
   log = "0.4"
@@ -32,7 +32,7 @@
   chrono = "0.4"
   signal-hook = "0.3"
   hex = "0.4"
-  base64 = "0.21"
+  base64 = "0.22"
   rand = "0.8"
   pbjson-types = "0.6"
   rumqttc = { version =  "0.24", features = [
