@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use std::fs;
 use std::time::Duration;
+use std::{env, fs};
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -18,9 +18,16 @@ pub struct Configuration {
 impl Configuration {
     pub fn get(filenames: &[String]) -> Result<Configuration> {
         let mut content = String::new();
+
         for file_name in filenames {
             content.push_str(&fs::read_to_string(file_name)?);
         }
+
+        // Replace environment variables in config.
+        for (k, v) in env::vars() {
+            content = content.replace(&format!("${}", k), &v);
+        }
+
         let config: Configuration = toml::from_str(&content)?;
         Ok(config)
     }
