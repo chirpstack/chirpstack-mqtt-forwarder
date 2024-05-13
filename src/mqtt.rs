@@ -13,7 +13,6 @@ use rumqttc::v5::mqttbytes::v5::{ConnectReturnCode, LastWill, Publish};
 use rumqttc::v5::{mqttbytes::QoS, AsyncClient, Event, Incoming, MqttOptions};
 use rumqttc::Transport;
 use rustls_pki_types::{CertificateDer, PrivateKeyDer};
-use serde::Serialize;
 use tokio::sync::mpsc;
 use tokio::time::sleep;
 
@@ -22,24 +21,6 @@ use crate::commands;
 use crate::config::Configuration;
 
 static STATE: OnceCell<Arc<State>> = OnceCell::new();
-
-#[derive(Serialize)]
-struct CommandTopicContext {
-    pub gateway_id: String,
-    pub command: String,
-}
-
-#[derive(Serialize)]
-struct EventTopicContext {
-    pub gateway_id: String,
-    pub event: String,
-}
-
-#[derive(Serialize)]
-struct StateTopciContext {
-    pub gateway_id: String,
-    pub state: String,
-}
 
 struct State {
     client: AsyncClient,
