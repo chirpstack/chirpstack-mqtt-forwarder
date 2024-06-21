@@ -187,6 +187,36 @@ async fn end_to_end() {
         pl
     );
 
+    // Mesh Stats
+    let mesh_stats_pl = gw::MeshStats {
+        gateway_id: "0102030405060708".into(),
+        ..Default::default()
+    };
+    thread::spawn({
+        let zmq_pub = zmq_pub.clone();
+        let mesh_stats_pl = mesh_stats_pl.encode_to_vec();
+
+        move || {
+            let zmq_pub = zmq_pub.lock().unwrap();
+            zmq_pub.send("mesh_stats", zmq::SNDMORE).unwrap();
+            zmq_pub.send(mesh_stats_pl, 0).unwrap();
+        }
+    });
+
+    let mqtt_msg = mqtt_rx.recv().await.unwrap();
+    assert_eq!(
+        "eu868/gateway/0102030405060708/event/mesh-stats",
+        String::from_utf8(mqtt_msg.topic.to_vec()).unwrap()
+    );
+    let pl = gw::MeshStats::decode(&mut Cursor::new(mqtt_msg.payload.to_vec())).unwrap();
+    assert_eq!(
+        gw::MeshStats {
+            gateway_id: "0102030405060708".into(),
+            ..Default::default()
+        },
+        pl
+    );
+
     // Downlink
     let down_pl = gw::DownlinkFrame {
         gateway_id: "0102030405060708".into(),

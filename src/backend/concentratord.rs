@@ -13,7 +13,7 @@ use tokio::task;
 use super::Backend as BackendTrait;
 use crate::config::Configuration;
 use crate::metadata;
-use crate::mqtt::{send_gateway_stats, send_tx_ack, send_uplink_frame};
+use crate::mqtt::{send_gateway_stats, send_mesh_stats, send_tx_ack, send_uplink_frame};
 
 pub struct Backend {
     gateway_id: String,
@@ -290,6 +290,11 @@ async fn handle_event_msg(
             info!("Received gateway stats");
             pl.metadata.extend(metadata::get().await?);
             send_gateway_stats(&pl).await?;
+        }
+        "mesh_stats" => {
+            let pl = gw::MeshStats::decode(pl)?;
+            info!("Received mesh stats");
+            send_mesh_stats(&pl).await?;
         }
         _ => {
             return Err(anyhow!("Unexpected event: {}", event));

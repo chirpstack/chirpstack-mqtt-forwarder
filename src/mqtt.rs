@@ -286,6 +286,21 @@ pub async fn send_gateway_stats(pl: &gw::GatewayStats) -> Result<()> {
     Ok(())
 }
 
+pub async fn send_mesh_stats(pl: &gw::MeshStats) -> Result<()> {
+    let state = STATE.get().ok_or_else(|| anyhow!("STATE is not set"))?;
+
+    let b = match state.json {
+        true => serde_json::to_vec(&pl)?,
+        false => pl.encode_to_vec(),
+    };
+    let topic = get_event_topic(&state.topic_prefix, &state.gateway_id, "mesh-stats");
+    info!("Sending mesh stats event, topic: {}", topic);
+    state.client.publish(topic, state.qos, false, b).await?;
+    trace!("Message published");
+
+    Ok(())
+}
+
 pub async fn send_tx_ack(pl: &gw::DownlinkTxAck) -> Result<()> {
     let state = STATE.get().ok_or_else(|| anyhow!("STATE is not set"))?;
 
