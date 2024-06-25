@@ -16,7 +16,7 @@
     "usage",
     "derive",
   ] }
-  chirpstack_api = { version = "4.9.0-test.1", default-features = false, features = [
+  chirpstack_api = { version = "4.9.0-test.2", default-features = false, features = [
     "json",
   ] }
   lrwn_filters = { version = "4.7", features = ["serde"] }
