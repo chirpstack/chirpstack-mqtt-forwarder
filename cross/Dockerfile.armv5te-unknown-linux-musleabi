@@ -1,4 +1,4 @@
-FROM ghcr.io/cross-rs/armv5te-unknown-linux-musleabi:latest
+FROM ghcr.io/cross-rs/armv5te-unknown-linux-musleabi:main
 
 RUN apt-get update && \
     apt-get --assume-yes install \
