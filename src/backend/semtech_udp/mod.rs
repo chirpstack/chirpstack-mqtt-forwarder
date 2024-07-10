@@ -388,11 +388,21 @@ async fn handle_push_data(state: &Arc<State>, data: &[u8], remote: &SocketAddr) 
         let s = state.export_stats().await?;
         stats.rx_packets_received_ok = s.rx_packets_received_ok;
         stats.tx_packets_emitted = s.tx_packets_emitted;
-        stats.rx_packets_per_frequency = s.rx_packets_per_frequency.clone();
-        stats.tx_packets_per_frequency = s.tx_packets_per_frequency.clone();
-        stats.rx_packets_per_modulation = s.rx_packets_per_modulation.clone();
-        stats.tx_packets_per_modulation = s.tx_packets_per_modulation.clone();
-        stats.tx_packets_per_status = s.tx_packets_per_status.clone();
+        stats
+            .rx_packets_per_frequency
+            .clone_from(&s.rx_packets_per_frequency);
+        stats
+            .tx_packets_per_frequency
+            .clone_from(&s.tx_packets_per_frequency);
+        stats
+            .rx_packets_per_modulation
+            .clone_from(&s.rx_packets_per_modulation);
+        stats
+            .tx_packets_per_modulation
+            .clone_from(&s.tx_packets_per_modulation);
+        stats
+            .tx_packets_per_status
+            .clone_from(&s.tx_packets_per_status);
         stats.metadata.extend(metadata::get().await?);
 
         send_gateway_stats(&stats).await?;

@@ -17,8 +17,8 @@ pub fn setup(conf: &Configuration) -> Result<()> {
 
     let mut metadata_w = metadata.write().unwrap();
     let mut commands_w = commands.write().unwrap();
-    *metadata_w = conf.metadata.r#static.clone();
-    *commands_w = conf.metadata.commands.clone();
+    metadata_w.clone_from(&conf.metadata.r#static);
+    commands_w.clone_from(&conf.metadata.commands);
 
     Ok(())
 }
