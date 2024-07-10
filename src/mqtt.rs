@@ -218,9 +218,13 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
 
                         match v {
                             Event::Incoming(Incoming::Publish(p)) => {
-                                if let Err(e) = message_callback(p).await {
-                                    error!("Handling message error, error: {}", e);
-                                }
+                                tokio::spawn({
+                                    async move {
+                                        if let Err(e) = message_callback(p).await {
+                                            error!("Handling message error, error: {}", e);
+                                        }
+                                    }
+                                });
                             }
                             Event::Incoming(Incoming::ConnAck(v)) => {
                                 if v.code == ConnectReturnCode::Success {
