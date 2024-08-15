@@ -153,4 +153,4 @@ devshell:
 
 # Enter the Docker based devshell.
 docker-devshell:
-	docker-compose run --rm chirpstack-mqtt-forwarder
+	docker compose run --rm chirpstack-mqtt-forwarder
