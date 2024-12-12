@@ -441,8 +441,9 @@ fn get_command_topic(prefix: &str, gateway_id: &str, command: &str) -> String {
 
 fn get_root_certs(ca_file: Option<String>) -> Result<rustls::RootCertStore> {
     let mut roots = rustls::RootCertStore::empty();
-    let certs = rustls_native_certs::load_native_certs()?;
-    roots.add_parsable_certificates(certs);
+    for cert in rustls_native_certs::load_native_certs().certs {
+        roots.add(cert)?;
+    }
 
     if let Some(ca_file) = &ca_file {
         let f = File::open(ca_file).context("Open CA certificate")?;
