@@ -3,7 +3,7 @@ use std::process::Stdio;
 
 use anyhow::Result;
 use chirpstack_api::gw;
-use log::info;
+use log::{error, info};
 use once_cell::sync::OnceCell;
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
@@ -74,9 +74,53 @@ pub async fn exec(pl: &gw::GatewayCommandExecRequest) -> Result<gw::GatewayComma
     })
 }
 
+pub async fn exec_callback(cmd_args: &[String]) {
+    tokio::spawn({
+        let cmd_args = cmd_args.to_vec();
+
+        async move {
+            if cmd_args.is_empty() {
+                return;
+            }
+
+            info!("Executing callback, callback: {:?}", cmd_args);
+
+            let mut cmd = Command::new(&cmd_args[0]);
+            if cmd_args.len() > 1 {
+                cmd.args(&cmd_args[1..]);
+            }
+
+            if let Err(e) = cmd.output().await {
+                error!(
+                    "Execute callback error, callback: {:?}, error: {}",
+                    cmd_args, e
+                );
+            }
+        }
+    });
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::{env, fs};
+
+    #[tokio::test]
+    async fn test_exec_callback() {
+        let temp_file = env::temp_dir().join("test.txt");
+        fs::write(&temp_file, vec![]).unwrap();
+        assert!(fs::exists(&temp_file).unwrap());
+
+        exec_callback(&[
+            "rm".into(),
+            temp_file.clone().into_os_string().into_string().unwrap(),
+        ])
+        .await;
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        assert_eq!(false, fs::exists(&temp_file).unwrap());
+    }
 
     #[tokio::test]
     async fn test_commands() {

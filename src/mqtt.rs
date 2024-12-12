@@ -208,6 +208,9 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
 
     // Eventloop
     tokio::spawn({
+        let on_mqtt_connected = conf.callbacks.on_mqtt_connected.clone();
+        let on_mqtt_connection_error = conf.callbacks.on_mqtt_connection_error.clone();
+
         async move {
             info!("Starting MQTT event loop");
 
@@ -228,6 +231,8 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
                             }
                             Event::Incoming(Incoming::ConnAck(v)) => {
                                 if v.code == ConnectReturnCode::Success {
+                                    commands::exec_callback(&on_mqtt_connected).await;
+
                                     if let Err(e) = connect_tx.try_send(()) {
                                         error!("Send to subscribe channel error, error: {}", e);
                                     }
@@ -240,6 +245,8 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
                         }
                     }
                     Err(e) => {
+                        commands::exec_callback(&on_mqtt_connection_error).await;
+
                         error!("MQTT error, error: {}", e);
                         sleep(Duration::from_secs(1)).await
                     }

@@ -13,6 +13,7 @@ pub struct Configuration {
     pub backend: Backend,
     pub metadata: Metadata,
     pub commands: HashMap<String, Vec<String>>,
+    pub callbacks: Callbacks,
 }
 
 impl Configuration {
@@ -167,4 +168,11 @@ impl Default for SemtechUdp {
 pub struct Metadata {
     pub r#static: HashMap<String, String>,
     pub commands: HashMap<String, Vec<String>>,
+}
+
+#[derive(Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct Callbacks {
+    pub on_mqtt_connected: Vec<String>,
+    pub on_mqtt_connection_error: Vec<String>,
 }

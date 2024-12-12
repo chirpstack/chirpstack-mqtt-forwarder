@@ -222,6 +222,22 @@ pub fn run(config: &Configuration) {
     {{/each}}
   ]
   {{/each}}
+
+
+# Callback commands.
+#
+# These are commands that are triggered by certain events (e.g. MQTT connected
+# or error). These commands are intended to e.g. trigger a LED of a gateway.
+# Commands are configured as an array, where the first item is the path to the
+# command, and the (optional) remaining elements are the arguments. An empty
+# array disables the callback.
+[callbacks]
+
+  # On MQTT connected.
+  on_mqtt_connected=[]
+
+  # On MQTT connection error.
+  on_mqtt_connection_error=[]
 "#;
 
     let reg = Handlebars::new();
