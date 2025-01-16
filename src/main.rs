@@ -56,8 +56,8 @@ async fn main() {
 
     commands::setup(&config).expect("Setup commands error");
     metadata::setup(&config).expect("Setup metadata error");
-    backend::setup(&config).await.expect("Setup backend error");
     mqtt::setup(&config).await.expect("Setup MQTT client error");
+    backend::setup(&config).await.expect("Setup backend error");
 
     let mut signals = Signals::new([SIGINT, SIGTERM]).unwrap();
     signals.forever().next();

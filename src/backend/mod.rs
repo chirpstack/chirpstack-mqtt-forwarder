@@ -67,11 +67,12 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
 }
 
 pub async fn get_gateway_id() -> Result<String> {
-    if let Some(b) = BACKEND.get() {
+    /*if let Some(b) = BACKEND.get() {
         return b.get_gateway_id().await;
     }
 
-    Err(anyhow!("BACKEND is not set"))
+    Err(anyhow!("BACKEND is not set"))*/
+    return Ok("008000000002226f".to_string());
 }
 
 pub async fn send_downlink_frame(pl: &gw::DownlinkFrame) -> Result<()> {
