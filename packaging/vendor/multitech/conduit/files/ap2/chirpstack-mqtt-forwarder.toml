@@ -29,3 +29,10 @@
   ca_cert=""
   tls_cert=""
   tls_key=""
+
+[gateway]
+  # Gateway ID.
+  #
+  # Only set this if you would like to override the Gateway ID fetched from the backend.
+  # This will allow the MQTT loop to start prior backend setup.
+  #gateway_id=""
