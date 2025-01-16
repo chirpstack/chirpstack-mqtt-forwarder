@@ -14,6 +14,7 @@ pub struct Configuration {
     pub metadata: Metadata,
     pub commands: HashMap<String, Vec<String>>,
     pub callbacks: Callbacks,
+    pub gateway: Gateway,
 }
 
 impl Configuration {
@@ -175,4 +176,18 @@ pub struct Metadata {
 pub struct Callbacks {
     pub on_mqtt_connected: Vec<String>,
     pub on_mqtt_connection_error: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(default)]
+pub struct Gateway {
+    pub gateway_id: Option<String>,
+}
+
+impl Default for Gateway {
+    fn default() -> Self {
+        Gateway {
+            gateway_id: None,
+        }
+    }
 }

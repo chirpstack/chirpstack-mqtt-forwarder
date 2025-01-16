@@ -56,8 +56,24 @@ async fn main() {
 
     commands::setup(&config).expect("Setup commands error");
     metadata::setup(&config).expect("Setup metadata error");
-    mqtt::setup(&config).await.expect("Setup MQTT client error");
-    backend::setup(&config).await.expect("Setup backend error");
+
+    // Check for overriden gateway_id in config, in which case it will be used
+    // rather than waiting to fetch it from backend
+    if let Some(gateway_id) = &config.gateway.gateway_id {
+        if gateway_id.chars().count() == 0 {
+            panic!("overriden config gateway_id must not be an empty string");
+        }
+
+        info!("Gateway ID overriden in config, starting MQTT loop before polling for backend.");
+
+        mqtt::setup(&config).await.expect("Setup MQTT client error");
+        backend::setup(&config).await.expect("Setup backend error");
+    }
+    else {
+        // poll for backend first to retrieve gateway_id
+        backend::setup(&config).await.expect("Setup backend error");
+        mqtt::setup(&config).await.expect("Setup MQTT client error");
+    }
 
     let mut signals = Signals::new([SIGINT, SIGTERM]).unwrap();
     signals.forever().next();

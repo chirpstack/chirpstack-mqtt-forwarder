@@ -45,7 +45,19 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
     };
 
     // get gateway id
-    let gateway_id = get_gateway_id().await?;
+    let gateway_id = if let Some(gateway_id) = &conf.gateway.gateway_id {
+        // use gateway id overriden in config
+        gateway_id.clone()
+    }
+    else {
+        // fetch from backend
+        get_gateway_id().await?
+    };
+
+    info!(
+        "Gateway ID retrieved, gateway_id: {}",
+        gateway_id
+    );
 
     // set client id
     let client_id = if conf.mqtt.client_id.is_empty() {

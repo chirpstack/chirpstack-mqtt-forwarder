@@ -238,6 +238,16 @@ pub fn run(config: &Configuration) {
 
   # On MQTT connection error.
   on_mqtt_connection_error=[]
+
+
+# Gateway configuration
+[gateway]
+
+  # Gateway ID.
+  #
+  # Only set this if you would like to override the Gateway ID fetched from the backend.
+  # This will allow the MQTT loop to start prior backend setup.
+  #gateway_id="{{ gateway.gateway_id }}"
 "#;
 
     let reg = Handlebars::new();
