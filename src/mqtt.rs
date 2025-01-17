@@ -1,7 +1,6 @@
 use std::fs::File;
 use std::io::{BufReader, Cursor};
 use std::sync::Arc;
-use std::time::Duration;
 
 use anyhow::{Context, Result};
 use chirpstack_api::gw;
@@ -210,6 +209,7 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
     tokio::spawn({
         let on_mqtt_connected = conf.callbacks.on_mqtt_connected.clone();
         let on_mqtt_connection_error = conf.callbacks.on_mqtt_connection_error.clone();
+        let reconnect_interval = conf.mqtt.reconnect_interval.clone();
 
         async move {
             info!("Starting MQTT event loop");
@@ -238,7 +238,7 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
                                     }
                                 } else {
                                     error!("Connection error, code: {:?}", v.code);
-                                    sleep(Duration::from_secs(1)).await
+                                    sleep(reconnect_interval).await
                                 }
                             }
                             _ => {}
@@ -248,7 +248,7 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
                         commands::exec_callback(&on_mqtt_connection_error).await;
 
                         error!("MQTT error, error: {}", e);
-                        sleep(Duration::from_secs(1)).await
+                        sleep(reconnect_interval).await
                     }
                 }
             }

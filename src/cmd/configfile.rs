@@ -100,6 +100,12 @@ pub fn run(config: &Configuration) {
   # TLS key file (optional)
   tls_key="{{ mqtt.tls_key }}"
 
+  # Reconnect interval.
+  #
+  # This defines the reconnection interval to the MQTT broker in case of
+  # network issues.
+  reconnect_interval="{{ integration.mqtt.reconnect_interval }}"
+
 
 # Backend configuration.
 [backend]
