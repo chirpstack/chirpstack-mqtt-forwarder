@@ -66,6 +66,8 @@ pub struct Mqtt {
     pub ca_cert: String,
     pub tls_cert: String,
     pub tls_key: String,
+    #[serde(with = "humantime_serde")]
+    pub reconnect_interval: Duration,
 }
 
 impl Default for Mqtt {
@@ -83,6 +85,7 @@ impl Default for Mqtt {
             ca_cert: "".into(),
             tls_cert: "".into(),
             tls_key: "".into(),
+            reconnect_interval: Duration::from_secs(1),
         }
     }
 }
