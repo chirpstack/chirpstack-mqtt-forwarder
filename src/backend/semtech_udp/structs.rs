@@ -385,8 +385,8 @@ impl RxPk {
         gateway_id: &[u8],
         time_fallback_enabled: bool,
     ) -> Result<Vec<gw::UplinkFrame>> {
-        let mut rng = rand::thread_rng();
-        let uplink_id = if cfg!(test) { 123 } else { rng.gen::<u32>() };
+        let mut rng = rand::rng();
+        let uplink_id: u32 = if cfg!(test) { 123 } else { rng.random() };
 
         let pl = gw::UplinkFrame {
             phy_payload: self.data.clone(),
@@ -483,7 +483,7 @@ impl RxPk {
         } else {
             let mut out: Vec<gw::UplinkFrame> = vec![];
             for rs in &self.rsig {
-                let uplink_id = if cfg!(test) { 123 } else { rng.gen::<u32>() };
+                let uplink_id: u32 = if cfg!(test) { 123 } else { rng.random() };
 
                 let mut pl = pl.clone();
                 let rx_info = pl.rx_info.as_mut().unwrap();

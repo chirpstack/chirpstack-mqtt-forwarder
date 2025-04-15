@@ -5,21 +5,20 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use chirpstack_api::gw;
 use log::{debug, error, info, trace};
-use once_cell::sync::OnceCell;
 use prost::Message;
 use rumqttc::tokio_rustls::rustls;
 use rumqttc::v5::mqttbytes::v5::{ConnectReturnCode, LastWill, Publish};
 use rumqttc::v5::{mqttbytes::QoS, AsyncClient, Event, Incoming, MqttOptions};
 use rumqttc::Transport;
 use rustls_pki_types::{CertificateDer, PrivateKeyDer};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, OnceCell};
 use tokio::time::sleep;
 
 use crate::backend::{get_gateway_id, send_configuration_command, send_downlink_frame};
 use crate::commands;
 use crate::config::Configuration;
 
-static STATE: OnceCell<Arc<State>> = OnceCell::new();
+static STATE: OnceCell<Arc<State>> = OnceCell::const_new();
 
 struct State {
     client: AsyncClient,

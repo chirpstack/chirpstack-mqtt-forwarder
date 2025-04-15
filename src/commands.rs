@@ -4,13 +4,13 @@ use std::process::Stdio;
 use anyhow::Result;
 use chirpstack_api::gw;
 use log::{error, info};
-use once_cell::sync::OnceCell;
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
+use tokio::sync::OnceCell;
 
 use crate::config::Configuration;
 
-static COMMANDS: OnceCell<HashMap<String, Vec<String>>> = OnceCell::new();
+static COMMANDS: OnceCell<HashMap<String, Vec<String>>> = OnceCell::const_new();
 
 pub fn setup(conf: &Configuration) -> Result<()> {
     COMMANDS

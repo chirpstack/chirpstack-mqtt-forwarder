@@ -5,7 +5,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use chirpstack_api::gw;
 use log::{debug, info};
-use once_cell::sync::OnceCell;
+use tokio::sync::OnceCell;
 
 use crate::config::Configuration;
 
@@ -14,7 +14,7 @@ pub mod concentratord;
 #[cfg(feature = "semtech_udp")]
 pub mod semtech_udp;
 
-static BACKEND: OnceCell<Box<dyn Backend + Sync + Send>> = OnceCell::new();
+static BACKEND: OnceCell<Box<dyn Backend + Sync + Send>> = OnceCell::const_new();
 
 #[async_trait]
 pub trait Backend {
@@ -31,7 +31,7 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
             let b = semtech_udp::Backend::setup(conf).await?;
             BACKEND
                 .set(Box::new(b))
-                .map_err(|_| anyhow!("OnceCell set error"))?;
+                .map_err(|e| anyhow!("OnceCell error: {}", e))?;
         }
         #[cfg(feature = "concentratord")]
         "concentratord" => {
@@ -39,7 +39,7 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
             let b = concentratord::Backend::setup(conf).await?;
             BACKEND
                 .set(Box::new(b))
-                .map_err(|_| anyhow!("OnceCell set error"))?;
+                .map_err(|e| anyhow!("OnceCell error: {}", e))?;
         }
         _ => {
             return Err(anyhow!("Unexpected backend: {}", conf.backend.enabled));

@@ -1,22 +1,20 @@
 use std::collections::HashMap;
-use std::sync::RwLock;
+use std::sync::{LazyLock, RwLock};
 
 use anyhow::Result;
 use log::error;
-use once_cell::sync::OnceCell;
 use tokio::process::Command;
 
 use crate::config::Configuration;
 
-static METADATA: OnceCell<RwLock<HashMap<String, String>>> = OnceCell::new();
-static COMMANDS: OnceCell<RwLock<HashMap<String, Vec<String>>>> = OnceCell::new();
+static METADATA: LazyLock<RwLock<HashMap<String, String>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+static COMMANDS: LazyLock<RwLock<HashMap<String, Vec<String>>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
 
 pub fn setup(conf: &Configuration) -> Result<()> {
-    let metadata = METADATA.get_or_init(|| RwLock::new(HashMap::new()));
-    let commands = COMMANDS.get_or_init(|| RwLock::new(HashMap::new()));
-
-    let mut metadata_w = metadata.write().unwrap();
-    let mut commands_w = commands.write().unwrap();
+    let mut metadata_w = METADATA.write().unwrap();
+    let mut commands_w = COMMANDS.write().unwrap();
     metadata_w.clone_from(&conf.metadata.r#static);
     commands_w.clone_from(&conf.metadata.commands);
 
@@ -24,24 +22,13 @@ pub fn setup(conf: &Configuration) -> Result<()> {
 }
 
 pub async fn get() -> Result<HashMap<String, String>> {
-    let mut metadata = METADATA
-        .get()
-        .ok_or_else(|| anyhow!("METADATA is not set"))?
-        .read()
-        .unwrap()
-        .clone();
-
+    let mut metadata = METADATA.read().unwrap().clone();
     metadata.insert(
         "mqtt_forwarder_version".to_string(),
         env!("CARGO_PKG_VERSION").to_string(),
     );
 
-    let commands = COMMANDS
-        .get()
-        .ok_or_else(|| anyhow!("COMMANDS is not set"))?
-        .read()
-        .unwrap()
-        .clone();
+    let commands = COMMANDS.read().unwrap().clone();
 
     for (k, v) in commands {
         if v.is_empty() {

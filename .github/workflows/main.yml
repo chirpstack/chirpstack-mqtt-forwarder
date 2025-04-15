@@ -34,6 +34,9 @@ jobs:
         name: Start dependency services
         run: docker compose up -d
       -
+        name: Install dev dependencies
+        run: nix-shell --command "make dev-dependencies"
+      -
         name: Run tests
         run: nix-shell --command "make test"
 
@@ -70,6 +73,9 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ runner.os }}-cargo-dist-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+      -
+        name: Install dev dependencies
+        run: nix-shell --command "make dev-dependencies"
       -
         name: Build distributables
         run: nix-shell --command "make dist-${{ matrix.target }}"
