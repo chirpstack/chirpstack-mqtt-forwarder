@@ -50,12 +50,10 @@ async fn end_to_end() {
     tokio::spawn({
         async move {
             loop {
-                match eventloop.poll().await {
-                    Ok(v) => match v {
-                        Event::Incoming(Incoming::Publish(p)) => mqtt_tx.send(p).await.unwrap(),
-                        _ => {}
-                    },
-                    Err(_) => {}
+                if let Ok(v) = eventloop.poll().await {
+                    if let Event::Incoming(Incoming::Publish(p)) = v {
+                        mqtt_tx.send(p).await.unwrap()
+                    }
                 }
             }
         }

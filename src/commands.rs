@@ -119,7 +119,7 @@ mod test {
 
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-        assert_eq!(false, fs::exists(&temp_file).unwrap());
+        assert!(!fs::exists(&temp_file).unwrap());
     }
 
     #[tokio::test]

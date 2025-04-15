@@ -677,11 +677,10 @@ impl PullResp {
                             timestamp.copy_from_slice(&tx_info.context[0..4]);
                             let mut timestamp = u32::from_be_bytes(timestamp);
 
-                            let delay = v
+                            let delay = *v
                                 .delay
                                 .as_ref()
-                                .ok_or_else(|| anyhow!("delay is missing"))?
-                                .clone();
+                                .ok_or_else(|| anyhow!("delay is missing"))?;
                             let delay: Duration = delay.try_into()?;
                             timestamp += delay.as_micros() as u32;
                             Some(timestamp)
@@ -690,11 +689,10 @@ impl PullResp {
                     },
                     tmms: match timing_params {
                         gw::timing::Parameters::GpsEpoch(v) => {
-                            let gps_time = v
+                            let gps_time = *v
                                 .time_since_gps_epoch
                                 .as_ref()
-                                .ok_or_else(|| anyhow!("time_since_gps_epoch is missing"))?
-                                .clone();
+                                .ok_or_else(|| anyhow!("time_since_gps_epoch is missing"))?;
                             let gps_time: Duration = gps_time.try_into()?;
                             Some(gps_time.as_millis() as u64)
                         }
