@@ -56,6 +56,12 @@ impl Backend {
             return Err(anyhow!("Could not read gateway id"));
         }
         let gateway_id = cmd_sock.recv_bytes(0)?;
+        if gateway_id.len() != 8 {
+            return Err(anyhow!(
+                "Invalid gateway id, expected 8 bytes, received {}",
+                gateway_id.len()
+            ));
+        }
         let gateway_id = hex::encode(gateway_id);
 
         info!("Received gateway id, gateway_id: {}", gateway_id);
