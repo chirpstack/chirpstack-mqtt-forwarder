@@ -208,7 +208,7 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
     tokio::spawn({
         let on_mqtt_connected = conf.callbacks.on_mqtt_connected.clone();
         let on_mqtt_connection_error = conf.callbacks.on_mqtt_connection_error.clone();
-        let reconnect_interval = conf.mqtt.reconnect_interval.clone();
+        let reconnect_interval = conf.mqtt.reconnect_interval;
 
         async move {
             info!("Starting MQTT event loop");
