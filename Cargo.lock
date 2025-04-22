@@ -228,9 +228,9 @@ dependencies = [
 
 [[package]]
 name = "chirpstack_api"
-version = "4.11.1"
+version = "4.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9fd068c5bb5c6d359416af5f011c8ee35f0578c57dd16f3319b0c6405c91c078"
+checksum = "88e36da3fd2016e1859993d9b8ff6758e38bd754489d289571c23ffe75b5d0b7"
 dependencies = [
  "hex",
  "pbjson",
@@ -238,7 +238,7 @@ dependencies = [
  "pbjson-types",
  "prost",
  "prost-types",
- "rand 0.8.5",
+ "rand 0.9.0",
  "serde",
  "tonic-build",
 ]
@@ -2086,9 +2086,9 @@ dependencies = [
 
 [[package]]
 name = "tonic-build"
-version = "0.12.3"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9557ce109ea773b399c9b9e5dca39294110b74f1f342cb347a80d1fce8c26a11"
+checksum = "d85f0383fadd15609306383a90e85eaed44169f931a5d2be1b42c76ceff1825e"
 dependencies = [
  "prettyplease",
  "proc-macro2",
