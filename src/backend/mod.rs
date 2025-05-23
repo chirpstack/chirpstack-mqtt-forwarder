@@ -19,8 +19,9 @@ static BACKEND: OnceCell<Box<dyn Backend + Sync + Send>> = OnceCell::const_new()
 #[async_trait]
 pub trait Backend {
     async fn get_gateway_id(&self) -> Result<String>;
-    async fn send_downlink_frame(&self, pl: &gw::DownlinkFrame) -> Result<()>;
-    async fn send_configuration_command(&self, pl: &gw::GatewayConfiguration) -> Result<()>;
+    async fn send_downlink_frame(&self, pl: gw::DownlinkFrame) -> Result<()>;
+    async fn send_configuration_command(&self, pl: gw::GatewayConfiguration) -> Result<()>;
+    async fn send_mesh_command(&self, pl: gw::MeshCommand) -> Result<()>;
 }
 
 pub async fn setup(conf: &Configuration) -> Result<()> {
@@ -74,7 +75,7 @@ pub async fn get_gateway_id() -> Result<String> {
     Err(anyhow!("BACKEND is not set"))
 }
 
-pub async fn send_downlink_frame(pl: &gw::DownlinkFrame) -> Result<()> {
+pub async fn send_downlink_frame(pl: gw::DownlinkFrame) -> Result<()> {
     if let Some(b) = BACKEND.get() {
         return b.send_downlink_frame(pl).await;
     }
@@ -82,9 +83,17 @@ pub async fn send_downlink_frame(pl: &gw::DownlinkFrame) -> Result<()> {
     Err(anyhow!("BACKEND is not set"))
 }
 
-pub async fn send_configuration_command(pl: &gw::GatewayConfiguration) -> Result<()> {
+pub async fn send_configuration_command(pl: gw::GatewayConfiguration) -> Result<()> {
     if let Some(b) = BACKEND.get() {
         return b.send_configuration_command(pl).await;
+    }
+
+    Err(anyhow!("BACKEND is not set"))
+}
+
+pub async fn send_mesh_command(pl: gw::MeshCommand) -> Result<()> {
+    if let Some(b) = BACKEND.get() {
+        return b.send_mesh_command(pl).await;
     }
 
     Err(anyhow!("BACKEND is not set"))

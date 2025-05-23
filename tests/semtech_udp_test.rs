@@ -3,13 +3,12 @@ use std::io::Cursor;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
-use prost::Message;
 use rumqttc::v5::{mqttbytes::QoS, AsyncClient, Event, Incoming, MqttOptions};
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc;
 use tokio::time::sleep;
 
-use chirpstack_api::{common, gw};
+use chirpstack_api::{common, gw, prost::Message};
 use chirpstack_mqtt_forwarder::config;
 
 #[tokio::test]

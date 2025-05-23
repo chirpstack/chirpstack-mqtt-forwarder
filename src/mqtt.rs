@@ -1,11 +1,10 @@
 use std::fs::File;
-use std::io::{BufReader, Cursor};
+use std::io::BufReader;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use chirpstack_api::gw;
+use chirpstack_api::{gw, prost::Message};
 use log::{debug, error, info, trace};
-use prost::Message;
 use rumqttc::tokio_rustls::rustls;
 use rumqttc::v5::mqttbytes::v5::{ConnectReturnCode, LastWill, Publish};
 use rumqttc::v5::{mqttbytes::QoS, AsyncClient, Event, Incoming, MqttOptions};
@@ -14,7 +13,9 @@ use rustls_pki_types::{CertificateDer, PrivateKeyDer};
 use tokio::sync::{mpsc, OnceCell};
 use tokio::time::sleep;
 
-use crate::backend::{get_gateway_id, send_configuration_command, send_downlink_frame};
+use crate::backend::{
+    get_gateway_id, send_configuration_command, send_downlink_frame, send_mesh_command,
+};
 use crate::commands;
 use crate::config::Configuration;
 
@@ -296,15 +297,15 @@ pub async fn send_gateway_stats(pl: &gw::GatewayStats) -> Result<()> {
     Ok(())
 }
 
-pub async fn send_mesh_heartbeat(pl: &gw::MeshHeartbeat) -> Result<()> {
+pub async fn send_mesh_event(pl: &gw::MeshEvent) -> Result<()> {
     let state = STATE.get().ok_or_else(|| anyhow!("STATE is not set"))?;
 
     let b = match state.json {
         true => serde_json::to_vec(&pl)?,
         false => pl.encode_to_vec(),
     };
-    let topic = get_event_topic(&state.topic_prefix, &state.gateway_id, "mesh-heartbeat");
-    info!("Sending mesh heartbeat event, topic: {}", topic);
+    let topic = get_event_topic(&state.topic_prefix, &state.gateway_id, "mesh");
+    info!("Sending mesh event, topic: {}", topic);
     state.client.publish(topic, state.qos, false, b).await?;
     trace!("Message published");
 
@@ -353,7 +354,7 @@ async fn message_callback(p: Publish) -> Result<()> {
         "down" => {
             let pl = match state.json {
                 true => serde_json::from_slice(&b)?,
-                false => gw::DownlinkFrame::decode(&mut Cursor::new(b))?,
+                false => gw::DownlinkFrame::decode(b.as_slice())?,
             };
             if pl.gateway_id != gateway_id {
                 return Err(anyhow!(
@@ -364,12 +365,12 @@ async fn message_callback(p: Publish) -> Result<()> {
                 "Received downlink command, downlink_id: {}, topic: {}",
                 pl.downlink_id, topic
             );
-            send_downlink_frame(&pl).await
+            send_downlink_frame(pl).await
         }
         "config" => {
             let pl = match state.json {
                 true => serde_json::from_slice(&b)?,
-                false => gw::GatewayConfiguration::decode(&mut Cursor::new(b))?,
+                false => gw::GatewayConfiguration::decode(b.as_slice())?,
             };
             if pl.gateway_id != gateway_id {
                 return Err(anyhow!(
@@ -380,12 +381,12 @@ async fn message_callback(p: Publish) -> Result<()> {
                 "Received configuration command, version: {}, topic: {}",
                 pl.version, topic
             );
-            send_configuration_command(&pl).await
+            send_configuration_command(pl).await
         }
         "exec" => {
             let pl = match state.json {
                 true => serde_json::from_slice(&b)?,
-                false => gw::GatewayCommandExecRequest::decode(&mut Cursor::new(b))?,
+                false => gw::GatewayCommandExecRequest::decode(b.as_slice())?,
             };
             if pl.gateway_id != gateway_id {
                 return Err(anyhow!(
@@ -397,6 +398,19 @@ async fn message_callback(p: Publish) -> Result<()> {
                 pl.exec_id, topic
             );
             handle_command_exec(&pl).await
+        }
+        "mesh" => {
+            let pl = match state.json {
+                true => serde_json::from_slice(&b)?,
+                false => gw::MeshCommand::decode(b.as_slice())?,
+            };
+            if pl.gateway_id != gateway_id {
+                return Err(anyhow!(
+                    "Gateway ID in payload does not match gateway ID in topic"
+                ));
+            }
+            info!("Received mesh command, topic: {}", topic);
+            send_mesh_command(pl).await
         }
         _ => Err(anyhow!("Unexpected command, command: {}", command)),
     }

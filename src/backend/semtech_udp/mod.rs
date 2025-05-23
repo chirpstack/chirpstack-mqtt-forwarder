@@ -6,9 +6,8 @@ use std::time::{Duration, SystemTime};
 
 use anyhow::Result;
 use async_trait::async_trait;
-use chirpstack_api::gw;
+use chirpstack_api::{gw, prost::Message};
 use log::{debug, info, trace, warn};
-use prost::Message;
 use tokio::net::UdpSocket;
 use tokio::sync::{Mutex, RwLock};
 
@@ -273,7 +272,7 @@ impl BackendTrait for Backend {
         Ok(gw_id)
     }
 
-    async fn send_downlink_frame(&self, pl: &gw::DownlinkFrame) -> Result<()> {
+    async fn send_downlink_frame(&self, pl: gw::DownlinkFrame) -> Result<()> {
         let mut acks: Vec<gw::DownlinkTxAckItem> = Vec::with_capacity(pl.items.len());
         for _ in &pl.items {
             acks.push(gw::DownlinkTxAckItem {
@@ -283,7 +282,11 @@ impl BackendTrait for Backend {
         send_downlink_frame(&self.state, pl, acks, 0).await
     }
 
-    async fn send_configuration_command(&self, _pl: &gw::GatewayConfiguration) -> Result<()> {
+    async fn send_configuration_command(&self, _pl: gw::GatewayConfiguration) -> Result<()> {
+        Ok(())
+    }
+
+    async fn send_mesh_command(&self, _pl: gw::MeshCommand) -> Result<()> {
         Ok(())
     }
 }
@@ -474,7 +477,7 @@ async fn handle_tx_ack(state: &Arc<State>, data: &[u8], remote: &SocketAddr) -> 
     } else {
         send_downlink_frame(
             state,
-            &downlink_cache.frame,
+            downlink_cache.frame,
             ack_items,
             downlink_cache.index + 1,
         )
@@ -484,7 +487,7 @@ async fn handle_tx_ack(state: &Arc<State>, data: &[u8], remote: &SocketAddr) -> 
 
 async fn send_downlink_frame(
     state: &Arc<State>,
-    pl: &gw::DownlinkFrame,
+    pl: gw::DownlinkFrame,
     acks: Vec<gw::DownlinkTxAckItem>,
     i: usize,
 ) -> Result<()> {
@@ -501,7 +504,7 @@ async fn send_downlink_frame(
         )
         .await;
 
-    let pull_resp = structs::PullResp::from_proto(pl, i, token)?;
+    let pull_resp = structs::PullResp::from_proto(&pl, i, token)?;
     let pull_addr = state.get_pull_addr().await?;
 
     info!(

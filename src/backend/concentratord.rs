@@ -1,19 +1,17 @@
-use std::io::Cursor;
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use chirpstack_api::gw;
+use chirpstack_api::{gw, prost::Message};
 use log::{debug, error, info, trace, warn};
-use prost::Message;
 use tokio::task;
 
 use super::Backend as BackendTrait;
 use crate::config::Configuration;
 use crate::metadata;
-use crate::mqtt::{send_gateway_stats, send_mesh_heartbeat, send_tx_ack, send_uplink_frame};
+use crate::mqtt::{send_gateway_stats, send_mesh_event, send_tx_ack, send_uplink_frame};
 
 pub struct Backend {
     gateway_id: String,
@@ -45,9 +43,13 @@ impl Backend {
 
         info!("Reading gateway id");
 
-        // send 'gateway_id' command with empty payload.
-        cmd_sock.send("gateway_id", zmq::SNDMORE)?;
-        cmd_sock.send("", 0)?;
+        // Request Gateway ID.
+        let req = gw::Command {
+            command: Some(gw::command::Command::GetGatewayId(
+                gw::GetGatewayIdRequest {},
+            )),
+        };
+        cmd_sock.send(req.encode_to_vec(), 0)?;
 
         // set poller so that we can timeout after 100ms
         let mut items = [cmd_sock.as_poll_item(zmq::POLLIN)];
@@ -55,16 +57,17 @@ impl Backend {
         if !items[0].is_readable() {
             return Err(anyhow!("Could not read gateway id"));
         }
-        let gateway_id = cmd_sock.recv_bytes(0)?;
-        if gateway_id.len() != 8 {
+
+        // Read response.
+        let resp = cmd_sock.recv_bytes(0)?;
+        let resp = gw::GetGatewayIdResponse::decode(resp.as_slice())?;
+        if resp.gateway_id.len() != 16 {
             return Err(anyhow!(
-                "Invalid gateway id, expected 8 bytes, received {}",
-                gateway_id.len()
+                "Invalid Gateway ID length, gateway_id: {}",
+                resp.gateway_id
             ));
         }
-        let gateway_id = hex::encode(gateway_id);
-
-        info!("Received gateway id, gateway_id: {}", gateway_id);
+        info!("Received gateway id, gateway_id: {}", resp.gateway_id);
 
         tokio::spawn({
             let forward_crc_ok = conf.backend.filters.forward_crc_ok;
@@ -88,18 +91,17 @@ impl Backend {
         });
 
         Ok(Backend {
-            gateway_id,
+            gateway_id: resp.gateway_id,
             ctx: zmq_ctx,
             cmd_url: conf.backend.concentratord.command_url.clone(),
             cmd_sock: Mutex::new(cmd_sock),
         })
     }
 
-    fn send_command(&self, cmd: &str, b: &[u8]) -> Result<Vec<u8>> {
+    fn send_command(&self, cmd: gw::Command) -> Result<Vec<u8>> {
         let res = || -> Result<Vec<u8>> {
             let cmd_sock = self.cmd_sock.lock().unwrap();
-            cmd_sock.send(cmd, zmq::SNDMORE)?;
-            cmd_sock.send(b, 0)?;
+            cmd_sock.send(cmd.encode_to_vec(), 0)?;
 
             // set poller so that we can timeout after 100ms
             let mut items = [cmd_sock.as_poll_item(zmq::POLLIN)];
@@ -109,8 +111,8 @@ impl Backend {
             }
 
             // red tx ack response
-            let resp_b: &[u8] = &cmd_sock.recv_bytes(0)?;
-            Ok(resp_b.to_vec())
+            let resp_b = cmd_sock.recv_bytes(0)?;
+            Ok(resp_b)
         }();
 
         if res.is_err() {
@@ -153,13 +155,16 @@ impl BackendTrait for Backend {
         Ok(self.gateway_id.clone())
     }
 
-    async fn send_downlink_frame(&self, pl: &gw::DownlinkFrame) -> Result<()> {
+    async fn send_downlink_frame(&self, pl: gw::DownlinkFrame) -> Result<()> {
         info!("Sending downlink frame, downlink_id: {}", pl.downlink_id);
+        let downlink_id = pl.downlink_id;
 
         let tx_ack = {
-            let b = pl.encode_to_vec();
-            let resp_b = self.send_command("down", &b)?;
-            gw::DownlinkTxAck::decode(&mut Cursor::new(resp_b))?
+            let cmd = gw::Command {
+                command: Some(gw::command::Command::SendDownlinkFrame(pl)),
+            };
+            let resp_b = self.send_command(cmd)?;
+            gw::DownlinkTxAck::decode(resp_b.as_slice())?
         };
 
         let ack_items: Vec<String> = tx_ack
@@ -170,17 +175,30 @@ impl BackendTrait for Backend {
 
         info!(
             "Received ack, items: {:?}, downlink_id: {}",
-            ack_items, pl.downlink_id
+            ack_items, downlink_id
         );
 
         send_tx_ack(&tx_ack).await
     }
 
-    async fn send_configuration_command(&self, pl: &gw::GatewayConfiguration) -> Result<()> {
+    async fn send_configuration_command(&self, pl: gw::GatewayConfiguration) -> Result<()> {
         info!("Sending configuration command, version: {}", pl.version);
 
-        let b = pl.encode_to_vec();
-        let _ = self.send_command("config", &b)?;
+        let cmd = gw::Command {
+            command: Some(gw::command::Command::SetGatewayConfiguration(pl)),
+        };
+        let _ = self.send_command(cmd)?;
+
+        Ok(())
+    }
+
+    async fn send_mesh_command(&self, pl: gw::MeshCommand) -> Result<()> {
+        info!("Sending mesh command");
+
+        let cmd = gw::Command {
+            command: Some(gw::command::Command::Mesh(pl)),
+        };
+        let _ = self.send_command(cmd)?;
 
         Ok(())
     }
@@ -197,37 +215,37 @@ async fn event_loop(
     let event_sock = Arc::new(Mutex::new(event_sock));
 
     loop {
-        let res = task::spawn_blocking({
+        let event = task::spawn_blocking({
             let event_sock = event_sock.clone();
 
-            move || -> Result<Vec<Vec<u8>>> {
+            move || -> Result<Option<gw::Event>> {
                 let event_sock = event_sock.lock().unwrap();
 
                 // set poller so that we can timeout after 100ms
                 let mut items = [event_sock.as_poll_item(zmq::POLLIN)];
                 zmq::poll(&mut items, 100)?;
                 if !items[0].is_readable() {
-                    return Ok(vec![]);
+                    return Ok(None);
                 }
 
-                let msg = event_sock.recv_multipart(0)?;
-                if msg.len() != 2 {
-                    return Err(anyhow!("Event must have two frames"));
-                }
-                Ok(msg)
+                let msg = event_sock.recv_bytes(0)?;
+                Ok(Some(gw::Event::decode(msg.as_slice())?))
             }
         })
         .await;
 
-        match res {
-            Ok(Ok(msg)) => {
-                if msg.len() != 2 {
-                    continue;
-                }
+        let event = match event {
+            Ok(v) => v,
+            Err(e) => {
+                error!("Task error: {}", e);
+                continue;
+            }
+        };
 
+        match event {
+            Ok(Some(v)) => {
                 if let Err(err) = handle_event_msg(
-                    &msg[0],
-                    &msg[1],
+                    v,
                     &filters,
                     forward_crc_ok,
                     forward_crc_invalid,
@@ -239,12 +257,9 @@ async fn event_loop(
                     continue;
                 }
             }
-            Ok(Err(err)) => {
-                error!("Receive event error, error: {}", err);
-                continue;
-            }
-            Err(err) => {
-                error!("{}", err);
+            Ok(None) => continue,
+            Err(e) => {
+                error!("Error reading event, error: {}", e);
                 continue;
             }
         }
@@ -252,59 +267,50 @@ async fn event_loop(
 }
 
 async fn handle_event_msg(
-    event: &[u8],
-    pl: &[u8],
+    event: gw::Event,
     filters: &lrwn_filters::Filters,
     forward_crc_ok: bool,
     forward_crc_invalid: bool,
     forward_crc_missing: bool,
 ) -> Result<()> {
-    let event = String::from_utf8(event.to_vec())?;
-    let pl = Cursor::new(pl.to_vec());
-
-    match event.as_str() {
-        "up" => {
-            let pl = gw::UplinkFrame::decode(pl)?;
-            if let Some(rx_info) = &pl.rx_info {
+    match event.event {
+        Some(gw::event::Event::UplinkFrame(v)) => {
+            if let Some(rx_info) = &v.rx_info {
                 if !((rx_info.crc_status() == gw::CrcStatus::CrcOk && forward_crc_ok)
                     || (rx_info.crc_status() == gw::CrcStatus::BadCrc && forward_crc_invalid)
                     || (rx_info.crc_status() == gw::CrcStatus::NoCrc && forward_crc_missing))
                 {
                     debug!(
                         "Ignoring uplink frame because of forward_crc_ flags, uplink_id: {}",
-                        pl.rx_info.as_ref().map(|v| v.uplink_id).unwrap_or_default(),
+                        v.rx_info.as_ref().map(|v| v.uplink_id).unwrap_or_default(),
                     );
                     return Ok(());
                 }
             }
 
-            if lrwn_filters::matches(&pl.phy_payload, filters) {
+            if lrwn_filters::matches(&v.phy_payload, filters) {
                 info!(
                     "Received uplink frame, uplink_id: {}",
-                    pl.rx_info.as_ref().map(|v| v.uplink_id).unwrap_or_default(),
+                    v.rx_info.as_ref().map(|v| v.uplink_id).unwrap_or_default(),
                 );
-                send_uplink_frame(&pl).await?;
+                send_uplink_frame(&v).await?;
             } else {
                 debug!(
                     "Ignoring uplink frame because of dev_addr and join_eui filters, uplink_id: {}",
-                    pl.rx_info.as_ref().map(|v| v.uplink_id).unwrap_or_default()
+                    v.rx_info.as_ref().map(|v| v.uplink_id).unwrap_or_default()
                 );
             }
         }
-        "stats" => {
-            let mut pl = gw::GatewayStats::decode(pl)?;
-            info!("Received gateway stats");
-            pl.metadata.extend(metadata::get().await?);
-            send_gateway_stats(&pl).await?;
+        Some(gw::event::Event::GatewayStats(mut v)) => {
+            info!("received gateway stats");
+            v.metadata.extend(metadata::get().await?);
+            send_gateway_stats(&v).await?;
         }
-        "mesh_heartbeat" => {
-            let pl = gw::MeshHeartbeat::decode(pl)?;
-            info!("Received mesh heartbeat");
-            send_mesh_heartbeat(&pl).await?;
+        Some(gw::event::Event::Mesh(v)) => {
+            info!("Received mesh event");
+            send_mesh_event(&v).await?;
         }
-        _ => {
-            return Err(anyhow!("Unexpected event: {}", event));
-        }
+        None => {}
     }
 
     Ok(())

@@ -1,15 +1,13 @@
 use std::env;
-use std::io::Cursor;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use prost::Message;
 use rumqttc::v5::{mqttbytes::QoS, AsyncClient, Event, Incoming, MqttOptions};
 use tokio::sync::mpsc;
 use tokio::time::sleep;
 
-use chirpstack_api::gw;
+use chirpstack_api::{gw, prost::Message};
 use chirpstack_mqtt_forwarder::config;
 
 #[tokio::test]
@@ -84,10 +82,16 @@ async fn end_to_end() {
 
         move || {
             let zmq_cmd = zmq_cmd.lock().unwrap();
-            let msg = zmq_cmd.recv_multipart(0).unwrap();
-            let cmd = String::from_utf8(msg[0].clone()).unwrap();
-            assert_eq!("gateway_id", cmd);
-            zmq_cmd.send(vec![1, 2, 3, 4, 5, 6, 7, 8], 0).unwrap();
+            let b = zmq_cmd.recv_bytes(0).unwrap();
+            let cmd = gw::Command::decode(b.as_slice()).unwrap();
+            if let Some(gw::command::Command::GetGatewayId(_)) = cmd.command {
+                let resp = gw::GetGatewayIdResponse {
+                    gateway_id: "0102030405060708".into(),
+                };
+                zmq_cmd.send(resp.encode_to_vec(), 0).unwrap();
+            } else {
+                panic!("Invalid command");
+            }
         }
     });
 
@@ -110,7 +114,7 @@ async fn end_to_end() {
         "eu868/gateway/0102030405060708/state/conn",
         String::from_utf8(mqtt_msg.topic.to_vec()).unwrap()
     );
-    let pl = gw::ConnState::decode(&mut Cursor::new(mqtt_msg.payload.to_vec())).unwrap();
+    let pl = gw::ConnState::decode(mqtt_msg.payload.to_vec().as_slice()).unwrap();
     assert_eq!(
         gw::ConnState {
             gateway_id: "0102030405060708".into(),
@@ -127,12 +131,13 @@ async fn end_to_end() {
     };
     thread::spawn({
         let zmq_pub = zmq_pub.clone();
-        let uplink_pl = uplink_pl.encode_to_vec();
+        let event = gw::Event {
+            event: Some(gw::event::Event::UplinkFrame(uplink_pl.clone())),
+        };
 
         move || {
             let zmq_pub = zmq_pub.lock().unwrap();
-            zmq_pub.send("up", zmq::SNDMORE).unwrap();
-            zmq_pub.send(uplink_pl, 0).unwrap();
+            zmq_pub.send(event.encode_to_vec(), 0).unwrap();
         }
     });
 
@@ -141,7 +146,7 @@ async fn end_to_end() {
         "eu868/gateway/0102030405060708/event/up",
         String::from_utf8(mqtt_msg.topic.to_vec()).unwrap()
     );
-    let pl = gw::UplinkFrame::decode(&mut Cursor::new(mqtt_msg.payload.to_vec())).unwrap();
+    let pl = gw::UplinkFrame::decode(mqtt_msg.payload.to_vec().as_slice()).unwrap();
     assert_eq!(uplink_pl, pl);
 
     // Stats
@@ -151,12 +156,13 @@ async fn end_to_end() {
     };
     thread::spawn({
         let zmq_pub = zmq_pub.clone();
-        let stats_pl = stats_pl.encode_to_vec();
+        let event = gw::Event {
+            event: Some(gw::event::Event::GatewayStats(stats_pl.clone())),
+        };
 
         move || {
             let zmq_pub = zmq_pub.lock().unwrap();
-            zmq_pub.send("stats", zmq::SNDMORE).unwrap();
-            zmq_pub.send(stats_pl, 0).unwrap();
+            zmq_pub.send(event.encode_to_vec(), 0).unwrap();
         }
     });
 
@@ -165,7 +171,7 @@ async fn end_to_end() {
         "eu868/gateway/0102030405060708/event/stats",
         String::from_utf8(mqtt_msg.topic.to_vec()).unwrap()
     );
-    let pl = gw::GatewayStats::decode(&mut Cursor::new(mqtt_msg.payload.to_vec())).unwrap();
+    let pl = gw::GatewayStats::decode(mqtt_msg.payload.to_vec().as_slice()).unwrap();
     assert_eq!(
         gw::GatewayStats {
             gateway_id: "0102030405060708".into(),
@@ -185,30 +191,31 @@ async fn end_to_end() {
         pl
     );
 
-    // Mesh Heartbeat
-    let mesh_heartbeat_pl = gw::MeshHeartbeat {
+    // Mesh event
+    let mesh_event = gw::MeshEvent {
         gateway_id: "0102030405060708".into(),
         ..Default::default()
     };
     thread::spawn({
         let zmq_pub = zmq_pub.clone();
-        let mesh_heartbeat_pl = mesh_heartbeat_pl.encode_to_vec();
+        let event = gw::Event {
+            event: Some(gw::event::Event::Mesh(mesh_event.clone())),
+        };
 
         move || {
             let zmq_pub = zmq_pub.lock().unwrap();
-            zmq_pub.send("mesh_heartbeat", zmq::SNDMORE).unwrap();
-            zmq_pub.send(mesh_heartbeat_pl, 0).unwrap();
+            zmq_pub.send(event.encode_to_vec(), 0).unwrap();
         }
     });
 
     let mqtt_msg = mqtt_rx.recv().await.unwrap();
     assert_eq!(
-        "eu868/gateway/0102030405060708/event/mesh-heartbeat",
+        "eu868/gateway/0102030405060708/event/mesh",
         String::from_utf8(mqtt_msg.topic.to_vec()).unwrap()
     );
-    let pl = gw::MeshHeartbeat::decode(&mut Cursor::new(mqtt_msg.payload.to_vec())).unwrap();
+    let pl = gw::MeshEvent::decode(mqtt_msg.payload.to_vec().as_slice()).unwrap();
     assert_eq!(
-        gw::MeshHeartbeat {
+        gw::MeshEvent {
             gateway_id: "0102030405060708".into(),
             ..Default::default()
         },
@@ -228,15 +235,16 @@ async fn end_to_end() {
 
     thread::spawn({
         let zmq_cmd = zmq_cmd.clone();
-        let down_pl = down_pl.encode_to_vec();
+        let cmd = gw::Command {
+            command: Some(gw::command::Command::SendDownlinkFrame(down_pl.clone())),
+        };
         let ack_pl = ack_pl.encode_to_vec();
 
         move || {
             let zmq_cmd = zmq_cmd.lock().unwrap();
-            let msg = zmq_cmd.recv_multipart(0).unwrap();
-            let cmd = String::from_utf8(msg[0].clone()).unwrap();
-            assert_eq!("down", cmd);
-            assert_eq!(down_pl, msg[1]);
+            let b = zmq_cmd.recv_bytes(0).unwrap();
+            let cmd_recv = gw::Command::decode(b.as_slice()).unwrap();
+            assert_eq!(cmd_recv, cmd);
             zmq_cmd.send(ack_pl, 0).unwrap();
         }
     });
@@ -256,7 +264,7 @@ async fn end_to_end() {
         "eu868/gateway/0102030405060708/event/ack",
         String::from_utf8(mqtt_msg.topic.to_vec()).unwrap()
     );
-    let pl = gw::DownlinkTxAck::decode(&mut Cursor::new(mqtt_msg.payload.to_vec())).unwrap();
+    let pl = gw::DownlinkTxAck::decode(mqtt_msg.payload.to_vec().as_slice()).unwrap();
     assert_eq!(ack_pl, pl);
 
     // Config
@@ -278,21 +286,24 @@ async fn end_to_end() {
 
     // Use spawn_blocking as else will will block the tokio thread,
     // which will also block the mqtt consume loop of the mqtt backend.
-    let msg = tokio::task::spawn_blocking({
+    let b = tokio::task::spawn_blocking({
         let zmq_cmd = zmq_cmd.clone();
 
         move || {
             let zmq_cmd = zmq_cmd.lock().unwrap();
-            let msg = zmq_cmd.recv_multipart(0).unwrap();
+            let b = zmq_cmd.recv_bytes(0).unwrap();
             zmq_cmd.send(vec![], 0).unwrap();
-
-            msg
+            b
         }
     })
     .await
     .unwrap();
 
-    let cmd = String::from_utf8(msg[0].clone()).unwrap();
-    assert_eq!("config", cmd);
-    assert_eq!(config_pl.encode_to_vec(), msg[1]);
+    let cmd = gw::Command::decode(b.as_slice()).unwrap();
+    assert_eq!(
+        gw::Command {
+            command: Some(gw::command::Command::SetGatewayConfiguration(config_pl)),
+        },
+        cmd
+    );
 }
