@@ -353,6 +353,9 @@ pub struct RxPk {
     /// Concentrator board used for RX (unsigned integer).
     #[serde(default)]
     pub brd: u32,
+    /// Antenna number on which signal has been received.
+    #[serde(default)]
+    pub ant: u8,
     /// CRC status: 1 = OK, -1 = fail, 0 = no CRC
     pub stat: Crc,
     /// Modulation identifier "LORA" or "Fsk"
@@ -464,7 +467,7 @@ impl RxPk {
                 channel: self.chan,
                 rf_chain: self.rfch,
                 board: self.brd,
-                antenna: 0,
+                antenna: self.ant.into(),
                 location: None,
                 context: self.tmst.to_be_bytes().to_vec(),
                 metadata: self.meta.as_ref().cloned().unwrap_or_default(),
@@ -1121,6 +1124,7 @@ mod test {
                     chan: 5,
                     rfch: 1,
                     brd: 3,
+                    ant: 1,
                     stat: Crc::Ok,
                     modu: Modulation::Lora,
                     datr: DataRate::Lora(7, 125000),
@@ -1163,6 +1167,7 @@ mod test {
                     channel: 5,
                     rf_chain: 1,
                     board: 3,
+                    antenna: 1,
                     context: vec![0, 0, 4, 210],
                     crc_status: gw::CrcStatus::CrcOk.into(),
                     ..Default::default()
@@ -1191,6 +1196,7 @@ mod test {
                     chan: 5,
                     rfch: 1,
                     brd: 3,
+                    ant: 1,
                     stat: Crc::Ok,
                     modu: Modulation::Lora,
                     datr: DataRate::Lora(7, 125000),
@@ -1236,6 +1242,7 @@ mod test {
                     channel: 5,
                     rf_chain: 1,
                     board: 3,
+                    antenna: 1,
                     context: vec![0, 0, 4, 210],
                     crc_status: gw::CrcStatus::CrcOk.into(),
                     ..Default::default()
@@ -1264,6 +1271,7 @@ mod test {
                     chan: 5,
                     rfch: 1,
                     brd: 3,
+                    ant: 1,
                     stat: Crc::Ok,
                     modu: Modulation::Lora,
                     datr: DataRate::Lora(7, 125000),
@@ -1312,6 +1320,7 @@ mod test {
                     channel: 5,
                     rf_chain: 1,
                     board: 3,
+                    antenna: 1,
                     context: vec![0, 0, 4, 210],
                     crc_status: gw::CrcStatus::CrcOk.into(),
                     ..Default::default()
@@ -1340,6 +1349,7 @@ mod test {
                     chan: 0,
                     rfch: 1,
                     brd: 3,
+                    ant: 0,
                     stat: Crc::Ok,
                     modu: Modulation::Lora,
                     datr: DataRate::Lora(7, 125000),
@@ -1456,6 +1466,7 @@ mod test {
                     chan: 5,
                     rfch: 1,
                     brd: 3,
+                    ant: 1,
                     stat: Crc::Ok,
                     modu: Modulation::Fsk,
                     datr: DataRate::Fsk(50_000),
@@ -1493,6 +1504,7 @@ mod test {
                     channel: 5,
                     rf_chain: 1,
                     board: 3,
+                    antenna: 1,
                     context: vec![0, 0, 4, 210],
                     crc_status: gw::CrcStatus::CrcOk.into(),
                     ..Default::default()
@@ -1521,6 +1533,7 @@ mod test {
                     chan: 5,
                     rfch: 1,
                     brd: 3,
+                    ant: 1,
                     stat: Crc::Ok,
                     modu: Modulation::LrFhss,
                     datr: DataRate::LrFhss(137_000),
@@ -1562,6 +1575,7 @@ mod test {
                     channel: 5,
                     rf_chain: 1,
                     board: 3,
+                    antenna: 1,
                     context: vec![0, 0, 4, 210],
                     crc_status: gw::CrcStatus::CrcOk.into(),
                     ..Default::default()
@@ -1590,6 +1604,7 @@ mod test {
                     chan: 5,
                     rfch: 1,
                     brd: 3,
+                    ant: 1,
                     stat: Crc::Ok,
                     modu: Modulation::Lora,
                     datr: DataRate::Lora(7, 125000),
@@ -1637,6 +1652,7 @@ mod test {
                     channel: 5,
                     rf_chain: 1,
                     board: 3,
+                    antenna: 1,
                     context: vec![0, 0, 4, 210],
                     metadata: [("gateway_name".to_string(), "test-gateway".to_string())]
                         .iter()
@@ -1667,6 +1683,7 @@ mod test {
                     chan: 5,
                     rfch: 1,
                     brd: 3,
+                    ant: 1,
                     stat: Crc::Ok,
                     modu: Modulation::Lora,
                     datr: DataRate::Lora(7, 125000),
@@ -1702,6 +1719,7 @@ mod test {
                     chan: 5,
                     rfch: 1,
                     brd: 3,
+                    ant: 1,
                     stat: Crc::Ok,
                     modu: Modulation::Lora,
                     datr: DataRate::Lora(7, 125000),
