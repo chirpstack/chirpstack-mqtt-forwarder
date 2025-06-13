@@ -529,7 +529,7 @@ pub struct Stat {
     pub long: f64,
     /// GPS altitude of the gateway in meter RX (integer).
     #[serde(default)]
-    pub alti: u32,
+    pub alti: f64,
     /// Number of radio packets received (unsigned integer).
     pub rxnb: u32,
     /// Number of radio packets received with a valid PHY CRC.
@@ -552,11 +552,11 @@ impl Stat {
             gateway_id: hex::encode(gateway_id),
             time: Some(pbjson_types::Timestamp::from(self.time)),
             location: {
-                if self.lati != 0.0 || self.long != 0.0 || self.alti != 0 {
+                if self.lati != 0.0 || self.long != 0.0 || self.alti != 0.0 {
                     Some(common::Location {
                         latitude: self.lati,
                         longitude: self.long,
-                        altitude: self.alti.into(),
+                        altitude: self.alti,
                         source: common::LocationSource::Gps.into(),
                         ..Default::default()
                     })
@@ -970,7 +970,7 @@ mod test {
                     time: now,
                     lati: 0.0,
                     long: 0.0,
-                    alti: 0,
+                    alti: 0.0,
                     rxnb: 10,
                     rxok: 5,
                     rxfw: 5,
@@ -1010,7 +1010,7 @@ mod test {
                     time: now,
                     lati: 1.1,
                     long: 2.2,
-                    alti: 3,
+                    alti: -3.3,
                     rxnb: 10,
                     rxok: 5,
                     rxfw: 5,
@@ -1032,7 +1032,7 @@ mod test {
                 location: Some(common::Location {
                     latitude: 1.1,
                     longitude: 2.2,
-                    altitude: 3.0,
+                    altitude: -3.3,
                     source: common::LocationSource::Gps.into(),
                     ..Default::default()
                 }),
@@ -1056,7 +1056,7 @@ mod test {
                     time: now,
                     lati: 0.0,
                     long: 0.0,
-                    alti: 0,
+                    alti: 0.0,
                     rxnb: 10,
                     rxok: 5,
                     rxfw: 5,
