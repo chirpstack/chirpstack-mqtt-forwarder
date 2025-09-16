@@ -85,7 +85,7 @@ pub fn run(config: &Configuration) {
   #
   # This defines the maximum time that that should pass without communication
   # between the client and server.
-  keep_alive_interval="{{ integration.mqtt.keep_alive_interval }}"
+  keep_alive_interval="{{ mqtt.keep_alive_interval }}"
 
   # CA certificate file (optional)
   #
