@@ -8,7 +8,7 @@ use tokio::net::UdpSocket;
 use tokio::sync::mpsc;
 use tokio::time::sleep;
 
-use chirpstack_api::{common, gw, prost::Message};
+use chirpstack_api::{common, gw, pbjson_types, prost::Message};
 use chirpstack_mqtt_forwarder::config;
 
 #[tokio::test]

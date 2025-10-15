@@ -3,9 +3,8 @@ use std::convert::TryInto;
 use std::time::Duration;
 
 use anyhow::Result;
-use chirpstack_api::{common, gw};
+use chirpstack_api::{common, gw, pbjson_types};
 use chrono::{DateTime, Utc};
-use rand::Rng;
 use serde::de::Error;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
@@ -388,8 +387,7 @@ impl RxPk {
         gateway_id: &[u8],
         time_fallback_enabled: bool,
     ) -> Result<Vec<gw::UplinkFrame>> {
-        let mut rng = rand::rng();
-        let uplink_id: u32 = if cfg!(test) { 123 } else { rng.random() };
+        let uplink_id: u32 = if cfg!(test) { 123 } else { getrandom::u32()? };
 
         let pl = gw::UplinkFrame {
             phy_payload: self.data.clone(),
@@ -486,7 +484,7 @@ impl RxPk {
         } else {
             let mut out: Vec<gw::UplinkFrame> = vec![];
             for rs in &self.rsig {
-                let uplink_id: u32 = if cfg!(test) { 123 } else { rng.random() };
+                let uplink_id: u32 = if cfg!(test) { 123 } else { getrandom::u32()? };
 
                 let mut pl = pl.clone();
                 let rx_info = pl.rx_info.as_mut().unwrap();
