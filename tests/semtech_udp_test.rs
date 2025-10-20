@@ -226,7 +226,7 @@ async fn end_to_end() {
     let size = socket.recv(&mut buffer).await.unwrap();
     assert_eq!(&[2, 210, 4, 3], &buffer[..4]);
     let json = String::from_utf8_lossy(&buffer[4..size]);
-    assert_eq!("{\"txpk\":{\"imme\":false,\"rfch\":0,\"powe\":16,\"ant\":0,\"brd\":0,\"tmst\":1001234,\"tmms\":null,\"freq\":868.3,\"modu\":\"LORA\",\"datr\":\"SF8BW125\",\"codr\":\"4/5\",\"fdev\":null,\"ncrc\":null,\"ipol\":false,\"prea\":null,\"size\":3,\"data\":\"AQID\"}}", json);
+    assert_eq!("{\"txpk\":{\"imme\":false,\"rfch\":0,\"powe\":16,\"ant\":0,\"brd\":0,\"tmst\":1001234,\"freq\":868.3,\"modu\":\"LORA\",\"datr\":\"SF8BW125\",\"codr\":\"4/5\",\"ipol\":false,\"size\":3,\"data\":\"AQID\"}}", json);
 
     // TX_ACK
     socket

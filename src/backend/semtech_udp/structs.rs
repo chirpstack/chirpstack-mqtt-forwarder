@@ -783,8 +783,10 @@ pub struct TxPk {
     /// Concentrator board used for RX (unsigned integer).
     pub brd: u8,
     /// Send packet on a certain timestamp value (will ignore time).
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tmst: Option<u32>,
     /// Send packet at a certain GPS time (GPS synchronization required).
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tmms: Option<u64>,
     /// TX central frequency in MHz (unsigned float, Hz precision).
     pub freq: f64,
@@ -793,14 +795,19 @@ pub struct TxPk {
     /// LoRa datarate identifier (eg. SF12BW500) || FSK datarate (unsigned, in bits per second).
     pub datr: DataRate,
     /// LoRa ECC coding rate identifier.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub codr: Option<CodeRate>,
     /// FSK frequency deviation (unsigned integer, in Hz).
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub fdev: Option<u16>,
     /// If true, disable the CRC of the physical layer (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ncrc: Option<bool>,
     /// Lora modulation polarization inversion.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ipol: Option<bool>,
     /// RF preamble size (unsigned integer).
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub prea: Option<u16>,
     /// RF packet payload size in bytes (unsigned integer).
     pub size: u16,
