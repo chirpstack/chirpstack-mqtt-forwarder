@@ -76,6 +76,7 @@ impl Backend {
             let filters = lrwn_filters::Filters {
                 dev_addr_prefixes: conf.backend.filters.dev_addr_prefixes.clone(),
                 join_eui_prefixes: conf.backend.filters.join_eui_prefixes.clone(),
+                lorawan_only: conf.backend.filters.lorawan_only,
             };
 
             async move {

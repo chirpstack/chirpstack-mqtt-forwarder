@@ -118,6 +118,7 @@ pub struct Filters {
     pub forward_crc_ok: bool,
     pub forward_crc_invalid: bool,
     pub forward_crc_missing: bool,
+    pub lorawan_only: bool,
     pub dev_addr_prefixes: Vec<lrwn_filters::DevAddrPrefix>,
     pub join_eui_prefixes: Vec<lrwn_filters::EuiPrefix>,
 }
@@ -128,6 +129,7 @@ impl Default for Filters {
             forward_crc_ok: true,
             forward_crc_invalid: false,
             forward_crc_missing: false,
+            lorawan_only: false,
             dev_addr_prefixes: vec![],
             join_eui_prefixes: vec![],
         }

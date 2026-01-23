@@ -16,15 +16,15 @@
     "usage",
     "derive",
   ] }
-  chirpstack_api = { version = "4.15", default-features = false, features = [
+  chirpstack_api = { version = "4.16", default-features = false, features = [
     "json",
   ] }
-  lrwn_filters = { version = "4.15", features = ["serde"] }
+  lrwn_filters = { version = "4.16", features = ["serde"] }
   serde_json = "1.0"
   serde = { version = "1.0", features = ["derive"] }
   humantime-serde = "1.1"
   log = "0.4"
-  simple_logger = { version = "5.0", default-features = false, features = [
+  simple_logger = { version = "5.1", default-features = false, features = [
     "timestamps",
   ] }
   syslog = "7.0"
@@ -35,17 +35,27 @@
     "serde",
   ] }
   chrono = { version = "0.4", default-features = false, features = ["now"] }
-  signal-hook = "0.3"
+  signal-hook = "0.4"
   hex = "0.4"
   base64 = "0.22"
-  getrandom = "0.3"
-  rumqttc = { version = "0.24", features = ["url", "websocket"] }
+  getrandom = { version = "0.3", features = ["std"] }
+  rumqttc = { version = "0.25", default-features = false, features = [
+    "url",
+    "websocket",
+    "use-rustls-no-provider",
+  ] }
   url = "2.5"
+  rustls = { version = "0.23", default-features = false, features = [
+    "logging",
+    "std",
+    "tls12",
+    "ring",
+  ] }
   rustls-native-certs = "0.8"
   rustls-pemfile = "2.2"
   rustls-pki-types = "1.12"
-  handlebars = "6.3"
-  tokio = { version = "1.48", features = [
+  handlebars = "6.4"
+  tokio = { version = "1.49", features = [
     "macros",
     "rt-multi-thread",
     "net",

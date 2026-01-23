@@ -130,6 +130,9 @@ pub fn run(config: &Configuration) {
     # Forward CRC missing.
     forward_crc_missing={{ backend.filters.forward_crc_missing }}
 
+    # LoRaWAN only.
+    lorawan_only={{backend.filters.lorawan_only}}
+
     # DevAddr prefix filters.
     #
     # Example configuration:
