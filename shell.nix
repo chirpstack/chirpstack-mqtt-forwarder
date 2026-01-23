@@ -20,7 +20,7 @@ pkgs.mkShell {
     pkgs.cargo-deb
   ];
   shellHook = ''
-    export PATH=$PATH:~/.cargo/bin
+    export PATH=$PWD/.cargo/bin:$PATH
   '';
   LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
   BINDGEN_EXTRA_CLANG_ARGS = "-I${pkgs.llvmPackages.libclang.lib}/lib/clang/${pkgs.llvmPackages.libclang.version}/include";

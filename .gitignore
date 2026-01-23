@@ -1,6 +1,5 @@
 # Hidden files
 .*
-!.cargo
 !.github
 !.vscode
 !.env
