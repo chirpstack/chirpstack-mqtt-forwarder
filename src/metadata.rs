@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::{LazyLock, RwLock};
 
 use anyhow::Result;
-use log::error;
+use log::{error, warn};
 use tokio::process::Command;
 
 use crate::config::Configuration;

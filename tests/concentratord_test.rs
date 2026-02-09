@@ -30,10 +30,18 @@ async fn end_to_end() {
     c.metadata
         .r#static
         .insert("foo".to_string(), "bar".to_string());
-    c.metadata.commands.insert(
-        "hello".to_string(),
-        vec!["echo".to_string(), "hello world".to_string()],
-    );
+    c.metadata.commands.extend([
+        (
+            "hello".to_string(),
+            vec!["echo".to_string(), "hello world".to_string()],
+        ),
+        (
+            "multiline".to_string(),
+            vec![
+                "echo".to_string(), "key1=value1\nkey2=value2\nkey3=value3".to_string(),
+             ],
+        ),
+    ]);
 
     // MQTT
     let mut mqtt_opts = MqttOptions::parse_url(format!(
@@ -182,6 +190,9 @@ async fn end_to_end() {
                 ),
                 ("foo".to_string(), "bar".to_string()),
                 ("hello".to_string(), "hello world".to_string()),
+                ("multiline_key1".to_string(), "value1".to_string()),
+                ("multiline_key2".to_string(), "value2".to_string()),
+                ("multiline_key3".to_string(), "value3".to_string()),
             ]
             .iter()
             .cloned()
