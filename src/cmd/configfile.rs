@@ -207,18 +207,24 @@ pub fn run(config: &Configuration) {
 
     # Split delimiter
     #
-    # When the output of a command returns multiple lines, ChirpStack MQTT Forwarder
-    # assumes multiple values are returned. In this case, it will split by the given delimiter
-    # to optain the key / value of each row. The key will be prefixed with the name of the 
-    # configured command.
-    # When the output of a command is a single line, ChirpStack MQTT Forwarder checks, if
-    # the line has the delimiter in it. if so, it splits by the delimiter and obtains key / value 
-    # The key will be prefixed with the name of the configured key. if the delimiter is not found, 
-    # Chirpstack MQTT Forwarder assumes, that the output is only a value and will return the name of the command
-    # as key and the output of the command as value.
-    # Default value of split_delimiter is =
-
-    # split_delimiter="="
+    # ChirpStack MQTT Forwarder will parse the return value as key / value
+    # data in the case:
+    #
+    #  * The return value contains a single line, which contains the split_delimiter
+    #  * In case multiple lines are returned
+    #
+    # In case a multi-line return value line does not contain the split_delimiter,
+    # a warning will be logged.
+    #
+    # Examples:
+    # 
+    # * example1 = ["echo", "Hello World"]
+    #     -> example1: Hello World
+    #
+    # * example2 = ["echo", "key1=Hello\nkey2=World\n"]
+    #     -> example2_key1: Hello,  example2_key2: World
+    #
+    split_delimiter="{{metadata.split_delimiter}}"
 
     # Example:
     # datetime=["date", "-R"]
@@ -261,7 +267,8 @@ pub fn run(config: &Configuration) {
   on_mqtt_connection_error=[]
 "#;
 
-    let reg = Handlebars::new();
+    let mut reg = Handlebars::new();
+    reg.register_escape_fn(|s| s.to_string().replace('"', r#"\""#));
     println!(
         "{}",
         reg.render_template(template, config)

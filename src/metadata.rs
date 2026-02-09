@@ -11,8 +11,7 @@ static METADATA: LazyLock<RwLock<HashMap<String, String>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 static COMMANDS: LazyLock<RwLock<HashMap<String, Vec<String>>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
-static SPLIT_DELIMITER: LazyLock<RwLock<String>> =
-    LazyLock::new(|| RwLock::new("=".to_string())); 
+static SPLIT_DELIMITER: LazyLock<RwLock<String>> = LazyLock::new(|| RwLock::new("=".to_string()));
 
 pub fn setup(conf: &Configuration) -> Result<()> {
     let mut metadata_w = METADATA.write().unwrap();
@@ -55,21 +54,17 @@ pub async fn get() -> Result<HashMap<String, String>> {
         let out = String::from_utf8(out.stdout)?;
         let lines: Vec<&str> = out.lines().collect();
 
-        if lines.len() > 1 {
-             for line in lines {
-                 if let Some((key, value)) = line.split_once(&split_delimiter) {
-                     let prefixed_key = format!("{}_{}", k, key.trim());
-                     metadata.insert(prefixed_key, value.trim().to_string());
-                 } else {
-                     warn!("Multi-line command output, but no delimiter {} detected: {}", split_delimiter, line);
-                 }
-             }
-        } else if let Some(line) = lines.first() {
+        for line in &lines {
             if let Some((key, value)) = line.split_once(&split_delimiter) {
                 let prefixed_key = format!("{}_{}", k, key.trim());
                 metadata.insert(prefixed_key, value.trim().to_string());
-            } else {
+            } else if lines.len() == 1 {
                 metadata.insert(k.to_string(), line.trim().to_string());
+            } else {
+                warn!(
+                    "Multi-line command output does not contain delimiter, delimiter: {}, line: {}",
+                    split_delimiter, line
+                );
             }
         }
     }
