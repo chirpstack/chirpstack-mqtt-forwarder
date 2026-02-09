@@ -168,11 +168,22 @@ impl Default for SemtechUdp {
     }
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize)]
 #[serde(default)]
 pub struct Metadata {
     pub r#static: HashMap<String, String>,
     pub commands: HashMap<String, Vec<String>>,
+    pub split_delimiter: String,
+}
+
+impl Default for Metadata {
+    fn default() -> Self {
+        Metadata {
+            r#static: HashMap::default(),
+            commands: HashMap::default(),
+            split_delimiter: "=".to_string(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Default)]
