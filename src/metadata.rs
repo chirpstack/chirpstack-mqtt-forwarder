@@ -11,12 +11,13 @@ static METADATA: LazyLock<RwLock<HashMap<String, String>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 static COMMANDS: LazyLock<RwLock<HashMap<String, Vec<String>>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
-static SPLIT_DELIMITER: LazyLock<RwLock<String>> = LazyLock::new(|| RwLock::new("=".to_string()));
+static SPLIT_DELIMITER: LazyLock<RwLock<String>> = LazyLock::new(|| RwLock::new("".into()));
 
 pub fn setup(conf: &Configuration) -> Result<()> {
     let mut metadata_w = METADATA.write().unwrap();
     let mut commands_w = COMMANDS.write().unwrap();
-    let mut split_delimiter_w = SPLIT_DELIMITER.write().unwrap(); // Access the delimiter
+    let mut split_delimiter_w = SPLIT_DELIMITER.write().unwrap();
+
     metadata_w.clone_from(&conf.metadata.r#static);
     commands_w.clone_from(&conf.metadata.commands);
     *split_delimiter_w = conf.metadata.split_delimiter.clone();
