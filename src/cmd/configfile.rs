@@ -205,6 +205,21 @@ pub fn run(config: &Configuration) {
   # Commands returning metadata.
   [metadata.commands]
 
+    # Split delimiter
+    #
+    # When the output of a command returns multiple lines, ChirpStack MQTT Forwarder
+    # assumes multiple values are returned. In this case, it will split by the given delimiter
+    # to optain the key / value of each row. The key will be prefixed with the name of the 
+    # configured command.
+    # When the output of a command is a single line, ChirpStack MQTT Forwarder checks, if
+    # the line has the delimiter in it. if so, it splits by the delimiter and obtains key / value 
+    # The key will be prefixed with the name of the configured key. if the delimiter is not found, 
+    # Chirpstack MQTT Forwarder assumes, that the output is only a value and will return the name of the command
+    # as key and the output of the command as value.
+    # Default value of split_delimiter is =
+
+    # split_delimiter="="
+
     # Example:
     # datetime=["date", "-R"]
     {{#each metadata.commands}}
@@ -214,37 +229,6 @@ pub fn run(config: &Configuration) {
       {{/each}}
     ]
     {{/each}}
-
-
-  # Dynamic commands (scripts) returning metadata.
-  [metadata.dynamic]
-
-    # Split delimiter.                                            
-    #        
-    # When the output of a command returns multiple lines, ChirpStack MQTT Forwarder
-    # assumes multiple values are returned. In this case it will split by the given delimiter
-    # to obtain the key / value of each row. The key will be prefixed with the name of the
-    # configured command.
-    split_delimiter="="
-
-    # Commands to execute.
-    #
-    # The value of the stdout will be used as the key value (string).
-    # In case the command failed, it is ignored. In case delimiter is not found in stdout  In case the same key is defined
-    # both as static and dynamic, the dynamic value has priority (as long as the) command does not fail.                                   
-    # If delimieter is not found in the stdout, the value is ignored and Chirpstack MQTT Forwarder will write a WARN log.
-
-    [metadata.dynamic.commands]
-      # Example:
-      #temperature="/opt/gateway-temperature/gateway-temperature.sh"
-      {{#each metadata.dynamic.commands}}
-      {{ @key }}=[
-        {{#each this}}
-        "{{ this }}",
-        {{/each}}
-      ]
-      {{/each}}
-
 
 
 # Executable commands.

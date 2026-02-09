@@ -171,14 +171,7 @@ impl Default for SemtechUdp {
 pub struct Metadata {
     pub r#static: HashMap<String, String>,
     pub commands: HashMap<String, Vec<String>>,
-    pub dynamic: DynamicMetadata,
-}
-
-#[derive(Serialize, Deserialize, Default)]
-#[serde(default)]
-pub struct DynamicMetadata {
-    pub split_delimiter: String, 
-    pub commands: HashMap<String, String>,
+    pub split_delimiter: String,
 }
 
 #[derive(Serialize, Deserialize, Default)]
