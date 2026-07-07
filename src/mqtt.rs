@@ -1,16 +1,17 @@
 use std::fs::File;
 use std::io::BufReader;
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::{Context, Result};
 use chirpstack_api::{gw, prost::Message};
 use log::{debug, error, info, trace};
-use rumqttc::tokio_rustls::rustls;
-use rumqttc::v5::mqttbytes::v5::{ConnectReturnCode, LastWill, Publish};
-use rumqttc::v5::{mqttbytes::QoS, AsyncClient, Event, Incoming, MqttOptions};
 use rumqttc::Transport;
+use rumqttc::tokio_rustls::rustls;
+use rumqttc::v5::mqttbytes::v5::{ConnectReturnCode, LastWill, Publish, SubscribeReasonCode};
+use rumqttc::v5::{AsyncClient, Event, Incoming, MqttOptions, mqttbytes::QoS};
 use rustls_pki_types::{CertificateDer, PrivateKeyDer};
-use tokio::sync::{mpsc, OnceCell};
+use tokio::sync::{OnceCell, mpsc};
 use tokio::time::sleep;
 
 use crate::backend::{
@@ -60,11 +61,11 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
         format!("{}/", conf.mqtt.topic_prefix)
     };
 
-    // Create connect channel
+    // Create subscribe channel
     // We need to re-subscribe on (re)connect to be sure we have a subscription. Even
     // in case of a persistent MQTT session, there is no guarantee that the MQTT persisted the
     // session and that a re-connect would recover the subscription.
-    let (connect_tx, mut connect_rx) = mpsc::channel(1);
+    let (subscribe_tx, mut subscribe_rx) = mpsc::channel(1);
 
     // last will and testament
     let lwt = gw::ConnState {
@@ -187,10 +188,16 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
         };
 
         async move {
-            while connect_rx.recv().await.is_some() {
-                info!("Subscribing to command topic, topic: {}", command_topic);
-                if let Err(e) = state.client.subscribe(&command_topic, state.qos).await {
-                    error!("Subscribing to command topic error, error: {}", e);
+            while subscribe_rx.recv().await.is_some() {
+                loop {
+                    info!("Subscribing to command topic, topic: {}", command_topic);
+                    if let Err(e) = state.client.subscribe(&command_topic, state.qos).await {
+                        error!("Subscribing to command topic error, error: {}", e);
+                    } else {
+                        break;
+                    }
+
+                    sleep(Duration::from_secs(1)).await;
                 }
 
                 info!("Sending conn state, topic: {}", state_topic);
@@ -233,7 +240,7 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
                                 if v.code == ConnectReturnCode::Success {
                                     commands::exec_callback(&on_mqtt_connected).await;
 
-                                    if let Err(e) = connect_tx.try_send(()) {
+                                    if let Err(e) = subscribe_tx.try_send(()) {
                                         error!("Send to subscribe channel error, error: {}", e);
                                     }
                                 } else {
@@ -241,6 +248,23 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
                                     sleep(reconnect_interval).await
                                 }
                             }
+                            Event::Incoming(Incoming::SubAck(v)) => {
+                                let errors: Vec<SubscribeReasonCode> = v
+                                    .return_codes
+                                    .iter()
+                                    .filter(|v| !matches!(v, SubscribeReasonCode::Success(_)))
+                                    .cloned()
+                                    .collect();
+
+                                if !errors.is_empty() {
+                                    error!("Subscribe ack returned errors, errors: {:?}", errors);
+
+                                    if let Err(e) = subscribe_tx.try_send(()) {
+                                        error!("Send to subscribe channel error, error: {}", e);
+                                    }
+                                }
+                            }
+
                             _ => {}
                         }
                     }
