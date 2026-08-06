@@ -67,7 +67,14 @@ impl Backend {
                 resp.gateway_id
             ));
         }
-        info!("Received gateway id, gateway_id: {}", resp.gateway_id);
+        if resp.gateway_id == "0000000000000000" {
+            return Err(anyhow!(
+                "Empty Gateway ID received, gateway_id: {}",
+                resp.gateway_id
+            ));
+        }
+
+        info!("Received Gateway ID, gateway_id: {}", resp.gateway_id);
 
         tokio::spawn({
             let forward_crc_ok = conf.backend.filters.forward_crc_ok;
@@ -280,13 +287,13 @@ async fn handle_event_msg(
                 && !((rx_info.crc_status() == gw::CrcStatus::CrcOk && forward_crc_ok)
                     || (rx_info.crc_status() == gw::CrcStatus::BadCrc && forward_crc_invalid)
                     || (rx_info.crc_status() == gw::CrcStatus::NoCrc && forward_crc_missing))
-                {
-                    debug!(
-                        "Ignoring uplink frame because of forward_crc_ flags, uplink_id: {}",
-                        v.rx_info.as_ref().map(|v| v.uplink_id).unwrap_or_default(),
-                    );
-                    return Ok(());
-                }
+            {
+                debug!(
+                    "Ignoring uplink frame because of forward_crc_ flags, uplink_id: {}",
+                    v.rx_info.as_ref().map(|v| v.uplink_id).unwrap_or_default(),
+                );
+                return Ok(());
+            }
 
             if lrwn_filters::matches(&v.phy_payload, filters) {
                 info!(
