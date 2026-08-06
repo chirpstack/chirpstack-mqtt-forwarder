@@ -16,7 +16,7 @@
     "usage",
     "derive",
   ] }
-  chirpstack_api = { version = "4.18", default-features = false, features = [
+  chirpstack_api = { version = "4.19", default-features = false, features = [
     "json",
   ] }
   lrwn_filters = { version = "4.16", features = ["serde"] }
@@ -37,7 +37,7 @@
   chrono = { version = "0.4", default-features = false, features = ["now"] }
   signal-hook = "0.4"
   hex = "0.4"
-  base64 = "0.22"
+  base64 = "0.23"
   getrandom = { version = "0.4", features = ["std"] }
   rumqttc = { version = "0.25", default-features = false, features = [
     "url",
@@ -55,7 +55,7 @@
   rustls-pemfile = "2.2"
   rustls-pki-types = "1.15"
   handlebars = "6.4"
-  tokio = { version = "1.52", features = [
+  tokio = { version = "1.53", features = [
     "macros",
     "rt-multi-thread",
     "net",
