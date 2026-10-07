@@ -3,7 +3,7 @@ use std::io::Cursor;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
-use rumqttc::v5::{mqttbytes::QoS, AsyncClient, Event, Incoming, MqttOptions};
+use rumqttc::{AsyncClient, Event, Incoming, MqttOptions, PublishOptions, QoS};
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc;
 use tokio::time::sleep;
@@ -15,6 +15,7 @@ use chirpstack_mqtt_forwarder::config;
 async fn end_to_end() {
     dotenv::dotenv().ok();
     dotenv::from_filename(".env.local").ok();
+    simple_logger::init().unwrap();
 
     let mut buffer: [u8; 65535] = [0; 65535];
 
@@ -41,11 +42,11 @@ async fn end_to_end() {
         (
             "multiline".to_string(),
             vec![
-                "echo".to_string(), "key1=value1\nkey2=value2\nkey3=value3".to_string(),
-             ],
+                "echo".to_string(),
+                "key1=value1\nkey2=value2\nkey3=value3".to_string(),
+            ],
         ),
     ]);
-
 
     // UDP
     let socket = UdpSocket::bind("0.0.0.0:0").await.unwrap();
@@ -58,7 +59,7 @@ async fn end_to_end() {
     ))
     .unwrap();
     mqtt_opts.set_clean_start(true);
-    let (client, mut eventloop) = AsyncClient::new(mqtt_opts, 100);
+    let (client, mut eventloop) = AsyncClient::builder(mqtt_opts).capacity(100).build();
     let (mqtt_tx, mut mqtt_rx) = mpsc::channel(100);
 
     tokio::spawn({
@@ -84,7 +85,7 @@ async fn end_to_end() {
 
     // Sleep some time to receive message from MQTT broker.
     // Drain the channel.
-    sleep(Duration::from_millis(100)).await;
+    sleep(Duration::from_millis(500)).await;
     loop {
         if mqtt_rx.try_recv().is_err() {
             break;
@@ -224,9 +225,8 @@ async fn end_to_end() {
     client
         .publish(
             "eu868/gateway/0102030405060708/command/down",
-            QoS::AtLeastOnce,
-            false,
             pl.encode_to_vec(),
+            PublishOptions::new(QoS::AtLeastOnce),
         )
         .await
         .unwrap();
@@ -235,7 +235,10 @@ async fn end_to_end() {
     let size = socket.recv(&mut buffer).await.unwrap();
     assert_eq!(&[2, 210, 4, 3], &buffer[..4]);
     let json = String::from_utf8_lossy(&buffer[4..size]);
-    assert_eq!("{\"txpk\":{\"imme\":false,\"rfch\":0,\"powe\":16,\"ant\":0,\"brd\":0,\"tmst\":1001234,\"freq\":868.3,\"modu\":\"LORA\",\"datr\":\"SF8BW125\",\"codr\":\"4/5\",\"ipol\":false,\"size\":3,\"data\":\"AQID\"}}", json);
+    assert_eq!(
+        "{\"txpk\":{\"imme\":false,\"rfch\":0,\"powe\":16,\"ant\":0,\"brd\":0,\"tmst\":1001234,\"freq\":868.3,\"modu\":\"LORA\",\"datr\":\"SF8BW125\",\"codr\":\"4/5\",\"ipol\":false,\"size\":3,\"data\":\"AQID\"}}",
+        json
+    );
 
     // TX_ACK
     socket

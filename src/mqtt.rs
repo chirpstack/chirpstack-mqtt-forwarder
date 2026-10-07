@@ -8,8 +8,10 @@ use chirpstack_api::{gw, prost::Message};
 use log::{debug, error, info, trace};
 use rumqttc::Transport;
 use rumqttc::tokio_rustls::rustls;
-use rumqttc::v5::mqttbytes::v5::{ConnectReturnCode, LastWill, Publish, SubscribeReasonCode};
-use rumqttc::v5::{AsyncClient, Event, Incoming, MqttOptions, mqttbytes::QoS};
+use rumqttc::{
+    AsyncClient, Broker, ConnectReturnCode, Event, Incoming, LastWill, MqttOptions, Publish,
+    PublishOptions, QoS, SubscribeReasonCode,
+};
 use rustls_pki_types::{CertificateDer, PrivateKeyDer};
 use tokio::sync::{OnceCell, mpsc};
 use tokio::time::sleep;
@@ -93,27 +95,29 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
     let mut mqtt_opts = match mqtt_url.scheme() {
         "mqtt" | "tcp" => MqttOptions::new(
             client_id,
-            mqtt_url.host_str().unwrap_or_default(),
-            mqtt_url.port().unwrap_or(1883),
+            Broker::tcp(
+                mqtt_url.host_str().unwrap_or_default(),
+                mqtt_url.port().unwrap_or(1883),
+            ),
         ),
         "mqtts" | "ssl" => {
             let mut m = MqttOptions::new(
                 client_id,
-                mqtt_url.host_str().unwrap_or_default(),
-                mqtt_url.port().unwrap_or(8883),
+                Broker::tcp(
+                    mqtt_url.host_str().unwrap_or_default(),
+                    mqtt_url.port().unwrap_or(8883),
+                ),
             );
             m.set_transport(Transport::tls_with_default_config());
             m
         }
         "ws" => {
-            let mut m =
-                MqttOptions::new(client_id, &conf.mqtt.server, mqtt_url.port().unwrap_or(80));
+            let mut m = MqttOptions::new(client_id, Broker::websocket(&conf.mqtt.server)?);
             m.set_transport(Transport::ws());
             m
         }
         "wss" => {
-            let mut m =
-                MqttOptions::new(client_id, &conf.mqtt.server, mqtt_url.port().unwrap_or(443));
+            let mut m = MqttOptions::new(client_id, Broker::websocket(&conf.mqtt.server)?);
             m.set_transport(Transport::wss_with_default_config());
             m
         }
@@ -122,9 +126,9 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
 
     mqtt_opts.set_last_will(lwt_msg);
     mqtt_opts.set_clean_start(conf.mqtt.clean_session);
-    mqtt_opts.set_keep_alive(conf.mqtt.keep_alive_interval);
+    mqtt_opts.set_keep_alive(conf.mqtt.keep_alive_interval.as_secs() as u16);
     if !conf.mqtt.username.is_empty() || !conf.mqtt.password.is_empty() {
-        mqtt_opts.set_credentials(&conf.mqtt.username, &conf.mqtt.password);
+        mqtt_opts.set_credentials(&conf.mqtt.username, conf.mqtt.password.clone());
     }
     if !conf.mqtt.ca_cert.is_empty()
         || !conf.mqtt.tls_cert.is_empty()
@@ -161,7 +165,7 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
         });
     }
 
-    let (client, mut eventloop) = AsyncClient::new(mqtt_opts, 100);
+    let (client, mut eventloop) = AsyncClient::builder(mqtt_opts).capacity(100).build();
     let state = State {
         client,
         topic_prefix,
@@ -203,7 +207,11 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
                 info!("Sending conn state, topic: {}", state_topic);
                 if let Err(e) = state
                     .client
-                    .publish(&state_topic, state.qos, true, b.clone())
+                    .publish(
+                        &state_topic,
+                        b.clone(),
+                        PublishOptions::new(state.qos).retained(),
+                    )
                     .await
                 {
                     error!("Sending state error: {}", e);
@@ -299,7 +307,10 @@ pub async fn send_uplink_frame(pl: &gw::UplinkFrame) -> Result<()> {
         topic
     );
 
-    state.client.publish(topic, state.qos, false, b).await?;
+    state
+        .client
+        .publish(topic, b, PublishOptions::new(state.qos))
+        .await?;
     trace!("Message published");
 
     Ok(())
@@ -315,7 +326,10 @@ pub async fn send_gateway_stats(pl: &gw::GatewayStats) -> Result<()> {
     let topic = get_event_topic(&state.topic_prefix, &state.gateway_id, "stats");
 
     info!("Sending gateway stats event, topic: {}", topic);
-    state.client.publish(topic, state.qos, false, b).await?;
+    state
+        .client
+        .publish(topic, b, PublishOptions::new(state.qos))
+        .await?;
     trace!("Message published");
 
     Ok(())
@@ -330,7 +344,10 @@ pub async fn send_mesh_event(pl: &gw::MeshEvent) -> Result<()> {
     };
     let topic = get_event_topic(&state.topic_prefix, &state.gateway_id, "mesh");
     info!("Sending mesh event, topic: {}", topic);
-    state.client.publish(topic, state.qos, false, b).await?;
+    state
+        .client
+        .publish(topic, b, PublishOptions::new(state.qos))
+        .await?;
     trace!("Message published");
 
     Ok(())
@@ -350,7 +367,10 @@ pub async fn send_tx_ack(pl: &gw::DownlinkTxAck) -> Result<()> {
         pl.downlink_id, topic
     );
 
-    state.client.publish(topic, state.qos, false, b).await?;
+    state
+        .client
+        .publish(topic, b, PublishOptions::new(state.qos))
+        .await?;
     trace!("Message published");
 
     Ok(())
@@ -464,7 +484,10 @@ async fn handle_command_exec(pl: &gw::GatewayCommandExecRequest) -> Result<()> {
         "Sending gateway command exec event, exec_id: {}, topic: {}",
         pl.exec_id, topic
     );
-    state.client.publish(topic, state.qos, false, b).await?;
+    state
+        .client
+        .publish(topic, b, PublishOptions::new(state.qos))
+        .await?;
 
     trace!("Message published");
 

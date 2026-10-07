@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use rumqttc::v5::{mqttbytes::QoS, AsyncClient, Event, Incoming, MqttOptions};
+use rumqttc::{AsyncClient, Event, Incoming, MqttOptions, PublishOptions, QoS};
 use tokio::sync::mpsc;
 use tokio::time::sleep;
 
@@ -14,6 +14,7 @@ use chirpstack_mqtt_forwarder::config;
 async fn end_to_end() {
     dotenv::dotenv().ok();
     dotenv::from_filename(".env.local").ok();
+    simple_logger::init().unwrap();
 
     let mut c = config::Configuration {
         backend: config::Backend {
@@ -62,7 +63,7 @@ async fn end_to_end() {
     ))
     .unwrap();
     mqtt_opts.set_clean_start(true);
-    let (client, mut eventloop) = AsyncClient::new(mqtt_opts, 100);
+    let (client, mut eventloop) = AsyncClient::builder(mqtt_opts).capacity(100).build();
     let (mqtt_tx, mut mqtt_rx) = mpsc::channel(100);
 
     tokio::spawn({
@@ -117,7 +118,7 @@ async fn end_to_end() {
 
     // Sleep some time to receive message from MQTT broker.
     // Drain the channel.
-    sleep(Duration::from_millis(100)).await;
+    sleep(Duration::from_millis(500)).await;
     loop {
         if mqtt_rx.try_recv().is_err() {
             break;
@@ -278,9 +279,8 @@ async fn end_to_end() {
     client
         .publish(
             "eu868/gateway/0102030405060708/command/down",
-            QoS::AtLeastOnce,
-            false,
             down_pl.encode_to_vec(),
+            PublishOptions::new(QoS::AtLeastOnce),
         )
         .await
         .unwrap();
@@ -303,9 +303,8 @@ async fn end_to_end() {
     client
         .publish(
             "eu868/gateway/0102030405060708/command/config",
-            QoS::AtLeastOnce,
-            false,
             config_pl.encode_to_vec(),
+            PublishOptions::new(QoS::AtLeastOnce),
         )
         .await
         .unwrap();
