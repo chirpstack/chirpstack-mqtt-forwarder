@@ -106,6 +106,13 @@ pub fn run(config: &Configuration) {
   # network issues.
   reconnect_interval="{{ integration.mqtt.reconnect_interval }}"
 
+  # Publish-channel size.
+  #
+  # This defines the size of the publish channel. If the MQTT client unavailable
+  # because of e.g. certificate reload, messages stay in the channel until the
+  # MQTT client is back available, until the max. channel size has been reached.
+  publish_channel_size={{ integration.mqtt.publish_channel_size }}
+
 
 # Backend configuration.
 [backend]

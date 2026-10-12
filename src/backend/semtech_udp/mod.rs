@@ -367,14 +367,14 @@ async fn handle_push_data(state: &Arc<State>, data: &[u8], remote: &SocketAddr) 
             && !((rx_info.crc_status() == gw::CrcStatus::CrcOk && state.forward_crc_ok)
                 || (rx_info.crc_status() == gw::CrcStatus::BadCrc && state.forward_crc_invalid)
                 || (rx_info.crc_status() == gw::CrcStatus::NoCrc && state.forward_crc_missing))
-            {
-                debug!(
-                    "Ignoring uplink frame because of forward_crc_ flags, uplink_id: {}",
-                    uf.rx_info.as_ref().map(|v| v.uplink_id).unwrap_or_default(),
-                );
+        {
+            debug!(
+                "Ignoring uplink frame because of forward_crc_ flags, uplink_id: {}",
+                uf.rx_info.as_ref().map(|v| v.uplink_id).unwrap_or_default(),
+            );
 
-                continue;
-            }
+            continue;
+        }
 
         if lrwn_filters::matches(&uf.phy_payload, &state.filters) {
             state.count_uplink(uf).await?;

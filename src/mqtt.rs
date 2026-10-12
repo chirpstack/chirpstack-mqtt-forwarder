@@ -1,6 +1,6 @@
 use std::fs::File;
 use std::io::BufReader;
-use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use anyhow::{Context, Result};
@@ -13,7 +13,8 @@ use rumqttc::{
     PublishOptions, QoS, SubscribeReasonCode,
 };
 use rustls_pki_types::{CertificateDer, PrivateKeyDer};
-use tokio::sync::{OnceCell, mpsc};
+use tokio::sync::{Mutex, OnceCell, broadcast, mpsc};
+use tokio::task::JoinSet;
 use tokio::time::sleep;
 
 use crate::backend::{
@@ -22,22 +23,31 @@ use crate::backend::{
 use crate::commands;
 use crate::config::Configuration;
 
-static STATE: OnceCell<Arc<State>> = OnceCell::const_new();
+static JSON: AtomicBool = AtomicBool::new(false);
+static PUB_CHANNEL_TX: OnceCell<mpsc::Sender<MqttMessage>> = OnceCell::const_new();
+static PUB_CHANNEL_RX: OnceCell<Mutex<mpsc::Receiver<MqttMessage>>> = OnceCell::const_new();
 
-struct State {
-    client: AsyncClient,
-    qos: QoS,
-    json: bool,
-    gateway_id: String,
-    topic_prefix: String,
+struct MqttMessage {
+    typ: String,
+    bytes: Vec<u8>,
 }
 
-pub async fn setup(conf: &Configuration) -> Result<()> {
-    if STATE.get().is_some() {
-        return Ok(());
+pub async fn run(conf: &Configuration, mut terminate_rx: broadcast::Receiver<()>) -> Result<()> {
+    debug!("Setting up MQTT client");
+
+    debug!("Setting up publish channel");
+    if PUB_CHANNEL_TX.get().is_none() || PUB_CHANNEL_RX.get().is_none() {
+        let (pub_channel_tx, pub_channel_rx) = mpsc::channel(conf.mqtt.publish_channel_size);
+        PUB_CHANNEL_TX
+            .set(pub_channel_tx)
+            .map_err(|_| anyhow!("set PUB_CHANNEL_TX error"))?;
+        PUB_CHANNEL_RX
+            .set(Mutex::new(pub_channel_rx))
+            .map_err(|_| anyhow!("set PUB_CHANNEL_RX error"))?;
     }
 
-    debug!("Setting up MQTT client");
+    debug!("Setting JSON flag, json = {}", conf.mqtt.json);
+    JSON.store(conf.mqtt.json, Ordering::Relaxed);
 
     let qos = match conf.mqtt.qos {
         0 => QoS::AtMostOnce,
@@ -58,9 +68,9 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
 
     // get mqtt prefix
     let topic_prefix = if conf.mqtt.topic_prefix.is_empty() {
-        "".to_string()
+        format!("gateway/{}", gateway_id)
     } else {
-        format!("{}/", conf.mqtt.topic_prefix)
+        format!("{}/gateway/{}", conf.mqtt.topic_prefix, gateway_id)
     };
 
     // Create subscribe channel
@@ -79,7 +89,7 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
         true => serde_json::to_vec(&lwt)?,
         false => lwt.encode_to_vec(),
     };
-    let lwt_topic = get_state_topic(&topic_prefix, &gateway_id, "conn");
+    let lwt_topic = format!("{}/state/conn", topic_prefix);
     let lwt_msg = LastWill {
         qos,
         topic: lwt_topic.into(),
@@ -166,36 +176,30 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
     }
 
     let (client, mut eventloop) = AsyncClient::builder(mqtt_opts).capacity(100).build();
-    let state = State {
-        client,
-        topic_prefix,
-        qos,
-        json: conf.mqtt.json,
-        gateway_id: gateway_id.clone(),
-    };
-    let state = Arc::new(state);
+    let mut set = JoinSet::new();
 
     // (Re)subscribe loop
-    tokio::spawn({
-        let state = state.clone();
-        let command_topic = get_command_topic(&state.topic_prefix, &state.gateway_id, "+");
-        let state_topic = get_state_topic(&state.topic_prefix, &state.gateway_id, "conn");
+    set.spawn({
+        let client = client.clone();
+        let command_topic = format!("{}/command/+", topic_prefix);
+        let state_topic = format!("{}/state/conn", topic_prefix);
 
         let conn = gw::ConnState {
             gateway_id: gateway_id.clone(),
             state: gw::conn_state::State::Online.into(),
             ..Default::default()
         };
-        let b = match state.json {
+        let b = match conf.mqtt.json {
             true => serde_json::to_vec(&conn)?,
             false => conn.encode_to_vec(),
         };
 
         async move {
+            info!("Starting (re)subscribe loop");
             while subscribe_rx.recv().await.is_some() {
                 loop {
                     info!("Subscribing to command topic, topic: {}", command_topic);
-                    if let Err(e) = state.client.subscribe(&command_topic, state.qos).await {
+                    if let Err(e) = client.subscribe(&command_topic, qos).await {
                         error!("Subscribing to command topic error, error: {}", e);
                     } else {
                         break;
@@ -205,13 +209,8 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
                 }
 
                 info!("Sending conn state, topic: {}", state_topic);
-                if let Err(e) = state
-                    .client
-                    .publish(
-                        &state_topic,
-                        b.clone(),
-                        PublishOptions::new(state.qos).retained(),
-                    )
+                if let Err(e) = client
+                    .publish(&state_topic, b.clone(), PublishOptions::new(qos).retained())
                     .await
                 {
                     error!("Sending state error: {}", e);
@@ -220,8 +219,36 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
         }
     });
 
-    // Eventloop
-    tokio::spawn({
+    // publish loop
+    set.spawn({
+        let client = client.clone();
+        let topic_prefix = format!("{}/event", topic_prefix);
+        let mut pub_chan_rx = PUB_CHANNEL_RX
+            .get()
+            .ok_or_else(|| anyhow!("PUB_CHANNEL_RX is None"))?
+            .lock()
+            .await;
+
+        async move {
+            info!("Starting MQTT publish loop");
+            while let Some(msg) = pub_chan_rx.recv().await {
+                let topic = format!("{}/{}", topic_prefix, msg.typ);
+                info!(
+                    "Publishing event, type = {}, qos = {:?}, topic = {}",
+                    msg.typ, qos, topic
+                );
+                if let Err(e) = client
+                    .publish(&topic, msg.bytes, PublishOptions::new(qos))
+                    .await
+                {
+                    error!("Sending event error: {}", e);
+                }
+            }
+        }
+    });
+
+    // MQTT event loop
+    set.spawn({
         let on_mqtt_connected = conf.callbacks.on_mqtt_connected.clone();
         let on_mqtt_connection_error = conf.callbacks.on_mqtt_connection_error.clone();
         let reconnect_interval = conf.mqtt.reconnect_interval;
@@ -287,98 +314,106 @@ pub async fn setup(conf: &Configuration) -> Result<()> {
         }
     });
 
-    STATE.set(state).map_err(|_| anyhow!("Set STATE error"))?;
+    loop {
+        tokio::select! {
+            _ = terminate_rx.recv() => {
+                set.shutdown().await;
+                break;
+            },
+            res = set.join_next() => {
+                match res {
+                    Some(_) => {},
+                    None => break,
+                }
+            },
+        }
+    }
+
+    info!("MQTT client completed");
 
     Ok(())
 }
 
 pub async fn send_uplink_frame(pl: &gw::UplinkFrame) -> Result<()> {
-    let state = STATE.get().ok_or_else(|| anyhow!("STATE is not set"))?;
-
-    let b = match state.json {
+    let b = match JSON.load(Ordering::Relaxed) {
         true => serde_json::to_vec(&pl)?,
         false => pl.encode_to_vec(),
     };
-    let topic = get_event_topic(&state.topic_prefix, &state.gateway_id, "up");
 
     info!(
-        "Sending uplink event, uplink_id: {}, topic: {}",
+        "Sending uplink event, uplink_id: {}",
         pl.rx_info.as_ref().map(|v| v.uplink_id).unwrap_or_default(),
-        topic
     );
 
-    state
-        .client
-        .publish(topic, b, PublishOptions::new(state.qos))
-        .await?;
-    trace!("Message published");
+    PUB_CHANNEL_TX
+        .get()
+        .ok_or_else(|| anyhow!("PUB_CHANNEL_TX is None"))?
+        .try_send(MqttMessage {
+            typ: "up".into(),
+            bytes: b,
+        })?;
 
     Ok(())
 }
 
 pub async fn send_gateway_stats(pl: &gw::GatewayStats) -> Result<()> {
-    let state = STATE.get().ok_or_else(|| anyhow!("STATE is not set"))?;
-
-    let b = match state.json {
+    let b = match JSON.load(Ordering::Relaxed) {
         true => serde_json::to_vec(&pl)?,
         false => pl.encode_to_vec(),
     };
-    let topic = get_event_topic(&state.topic_prefix, &state.gateway_id, "stats");
 
-    info!("Sending gateway stats event, topic: {}", topic);
-    state
-        .client
-        .publish(topic, b, PublishOptions::new(state.qos))
-        .await?;
-    trace!("Message published");
+    info!("Sending gateway stats event");
+
+    PUB_CHANNEL_TX
+        .get()
+        .ok_or_else(|| anyhow!("PUB_CHANNEL_TX is None"))?
+        .try_send(MqttMessage {
+            typ: "stats".into(),
+            bytes: b,
+        })?;
 
     Ok(())
 }
 
 pub async fn send_mesh_event(pl: &gw::MeshEvent) -> Result<()> {
-    let state = STATE.get().ok_or_else(|| anyhow!("STATE is not set"))?;
-
-    let b = match state.json {
+    let b = match JSON.load(Ordering::Relaxed) {
         true => serde_json::to_vec(&pl)?,
         false => pl.encode_to_vec(),
     };
-    let topic = get_event_topic(&state.topic_prefix, &state.gateway_id, "mesh");
-    info!("Sending mesh event, topic: {}", topic);
-    state
-        .client
-        .publish(topic, b, PublishOptions::new(state.qos))
-        .await?;
-    trace!("Message published");
+
+    info!("Sending mesh event");
+
+    PUB_CHANNEL_TX
+        .get()
+        .ok_or_else(|| anyhow!("PUB_CHANNEL_TX is None"))?
+        .try_send(MqttMessage {
+            typ: "mesh".into(),
+            bytes: b,
+        })?;
 
     Ok(())
 }
 
 pub async fn send_tx_ack(pl: &gw::DownlinkTxAck) -> Result<()> {
-    let state = STATE.get().ok_or_else(|| anyhow!("STATE is not set"))?;
-
-    let b = match state.json {
+    let b = match JSON.load(Ordering::Relaxed) {
         true => serde_json::to_vec(&pl)?,
         false => pl.encode_to_vec(),
     };
-    let topic = get_event_topic(&state.topic_prefix, &state.gateway_id, "ack");
 
-    info!(
-        "Sending ack event, downlink_id: {}, topic: {}",
-        pl.downlink_id, topic
-    );
+    info!("Sending ack event, downlink_id: {}", pl.downlink_id);
 
-    state
-        .client
-        .publish(topic, b, PublishOptions::new(state.qos))
-        .await?;
-    trace!("Message published");
+    PUB_CHANNEL_TX
+        .get()
+        .ok_or_else(|| anyhow!("PUB_CHANNEL_TX is None"))?
+        .try_send(MqttMessage {
+            typ: "ack".into(),
+            bytes: b,
+        })?;
 
     Ok(())
 }
 
 async fn message_callback(p: Publish) -> Result<()> {
-    let state = STATE.get().ok_or_else(|| anyhow!("STATE is not set"))?;
-
     let topic = String::from_utf8(p.topic.to_vec())?;
     let qos = p.qos;
     let b = p.payload.to_vec();
@@ -394,9 +429,12 @@ async fn message_callback(p: Publish) -> Result<()> {
     let gateway_id = parts[parts.len() - 3];
     let command = parts[parts.len() - 1];
 
+    // get encoding (json or binary)
+    let json = JSON.load(Ordering::Relaxed);
+
     match command {
         "down" => {
-            let pl = match state.json {
+            let pl = match json {
                 true => serde_json::from_slice(&b)?,
                 false => gw::DownlinkFrame::decode(b.as_slice())?,
             };
@@ -412,7 +450,7 @@ async fn message_callback(p: Publish) -> Result<()> {
             send_downlink_frame(pl).await
         }
         "config" => {
-            let pl = match state.json {
+            let pl = match json {
                 true => serde_json::from_slice(&b)?,
                 false => gw::GatewayConfiguration::decode(b.as_slice())?,
             };
@@ -428,7 +466,7 @@ async fn message_callback(p: Publish) -> Result<()> {
             send_configuration_command(pl).await
         }
         "exec" => {
-            let pl = match state.json {
+            let pl = match json {
                 true => serde_json::from_slice(&b)?,
                 false => gw::GatewayCommandExecRequest::decode(b.as_slice())?,
             };
@@ -444,7 +482,7 @@ async fn message_callback(p: Publish) -> Result<()> {
             handle_command_exec(&pl).await
         }
         "mesh" => {
-            let pl = match state.json {
+            let pl = match json {
                 true => serde_json::from_slice(&b)?,
                 false => gw::MeshCommand::decode(b.as_slice())?,
             };
@@ -461,8 +499,6 @@ async fn message_callback(p: Publish) -> Result<()> {
 }
 
 async fn handle_command_exec(pl: &gw::GatewayCommandExecRequest) -> Result<()> {
-    let state = STATE.get().ok_or_else(|| anyhow!("STATE is not set"))?;
-
     let resp = match commands::exec(pl).await {
         Ok(v) => v,
         Err(e) => gw::GatewayCommandExecResponse {
@@ -473,37 +509,25 @@ async fn handle_command_exec(pl: &gw::GatewayCommandExecRequest) -> Result<()> {
         },
     };
 
-    let b = match state.json {
+    let b = match JSON.load(Ordering::Relaxed) {
         true => serde_json::to_vec(&resp)?,
         false => resp.encode_to_vec(),
     };
 
-    let topic = get_event_topic(&state.topic_prefix, &state.gateway_id, "exec");
-
     info!(
-        "Sending gateway command exec event, exec_id: {}, topic: {}",
-        pl.exec_id, topic
+        "Sending gateway command exec event, exec_id: {}",
+        pl.exec_id
     );
-    state
-        .client
-        .publish(topic, b, PublishOptions::new(state.qos))
-        .await?;
 
-    trace!("Message published");
+    PUB_CHANNEL_TX
+        .get()
+        .ok_or_else(|| anyhow!("PUB_CHANNEL_TX is None"))?
+        .try_send(MqttMessage {
+            typ: "exec".into(),
+            bytes: b,
+        })?;
 
     Ok(())
-}
-
-fn get_state_topic(prefix: &str, gateway_id: &str, state: &str) -> String {
-    format!("{}gateway/{}/state/{}", prefix, gateway_id, state)
-}
-
-fn get_event_topic(prefix: &str, gateway_id: &str, event: &str) -> String {
-    format!("{}gateway/{}/event/{}", prefix, gateway_id, event)
-}
-
-fn get_command_topic(prefix: &str, gateway_id: &str, command: &str) -> String {
-    format!("{}gateway/{}/command/{}", prefix, gateway_id, command)
 }
 
 fn get_root_certs(ca_file: Option<String>) -> Result<rustls::RootCertStore> {

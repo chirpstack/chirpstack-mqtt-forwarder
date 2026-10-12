@@ -68,6 +68,7 @@ pub struct Mqtt {
     pub tls_key: String,
     #[serde(with = "humantime_serde")]
     pub reconnect_interval: Duration,
+    pub publish_channel_size: usize,
 }
 
 impl Default for Mqtt {
@@ -86,6 +87,7 @@ impl Default for Mqtt {
             tls_cert: "".into(),
             tls_key: "".into(),
             reconnect_interval: Duration::from_secs(1),
+            publish_channel_size: 100,
         }
     }
 }

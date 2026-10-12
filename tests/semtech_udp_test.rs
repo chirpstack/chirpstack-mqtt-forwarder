@@ -5,7 +5,7 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use rumqttc::{AsyncClient, Event, Incoming, MqttOptions, PublishOptions, QoS};
 use tokio::net::UdpSocket;
-use tokio::sync::mpsc;
+use tokio::sync::{broadcast, mpsc};
 use tokio::time::sleep;
 
 use chirpstack_api::{common, gw, pbjson_types, prost::Message};
@@ -92,9 +92,17 @@ async fn end_to_end() {
         }
     }
 
+    let (terminate_tx, terminate_rx) = broadcast::channel::<()>(1);
+
     chirpstack_mqtt_forwarder::metadata::setup(&c).unwrap();
     chirpstack_mqtt_forwarder::backend::setup(&c).await.unwrap();
-    chirpstack_mqtt_forwarder::mqtt::setup(&c).await.unwrap();
+    tokio::spawn({
+        async move {
+            chirpstack_mqtt_forwarder::mqtt::run(&c, terminate_rx)
+                .await
+                .unwrap();
+        }
+    });
 
     // PULL_DATA
     socket
@@ -353,4 +361,6 @@ async fn end_to_end() {
         },
         pl
     );
+
+    terminate_tx.send(()).unwrap();
 }

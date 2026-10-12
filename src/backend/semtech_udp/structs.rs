@@ -921,7 +921,7 @@ mod expanded_time_format {
 }
 
 mod base64_bytes {
-    use base64::{engine::general_purpose, Engine as _};
+    use base64::{Engine as _, engine::general_purpose};
     use serde::{Deserializer, Serializer};
 
     pub fn serialize<S>(b: &[u8], serializer: S) -> Result<S::Ok, S::Error>
