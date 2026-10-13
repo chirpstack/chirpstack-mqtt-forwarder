@@ -126,11 +126,7 @@ pub async fn run(conf: &Configuration, mut terminate_rx: broadcast::Receiver<()>
             m.set_transport(Transport::ws());
             m
         }
-        "wss" => {
-            let mut m = MqttOptions::new(client_id, Broker::websocket(&conf.mqtt.server)?);
-            m.set_transport(Transport::wss_with_default_config());
-            m
-        }
+        "wss" => MqttOptions::try_websocket_with_default_tls(client_id, &conf.mqtt.server)?,
         _ => return Err(anyhow!("Invalid scheme: {}", mqtt_url.scheme())),
     };
 
