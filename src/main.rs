@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use clap::{Parser, Subcommand};
 use log::info;
-use signal_hook::{consts::SIGHUP, consts::SIGINT, consts::SIGTERM, iterator::Signals};
+use tokio::signal::unix::{SignalKind, signal};
 use tokio::sync::broadcast;
 use tokio::time::sleep;
 
@@ -66,12 +66,17 @@ async fn main() {
         let terminate_tx = terminate_tx.clone();
 
         async move {
-            let mut signals = Signals::new([SIGINT, SIGTERM, SIGHUP]).unwrap();
-            while let Some(signal) = signals.forever().next() {
-                if signal == SIGHUP {
-                    terminate_tx.send(()).unwrap();
-                } else {
-                    process::exit(0);
+            let mut sighub = signal(SignalKind::hangup()).unwrap();
+            let mut sigint = signal(SignalKind::interrupt()).unwrap();
+            let mut sigterm = signal(SignalKind::terminate()).unwrap();
+
+            loop {
+                tokio::select! {
+                    Some(_) = sighub.recv() => {
+                        terminate_tx.send(()).unwrap();
+                    },
+                    Some(_) = sigint.recv() => process::exit(0),
+                    Some(_) = sigterm.recv() => process::exit(0),
                 }
             }
         }

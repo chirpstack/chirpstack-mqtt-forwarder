@@ -35,7 +35,6 @@
     "serde",
   ] }
   chrono = { version = "0.4", default-features = false, features = ["now"] }
-  signal-hook = "0.4"
   hex = "0.4"
   base64 = "0.23"
   getrandom = { version = "0.4", features = ["std"] }
@@ -57,6 +56,7 @@
     "io-util",
     "sync",
     "time",
+    "signal",
   ] }
   async-trait = "0.1"
   zmq = { version = "0.10", optional = true }
