@@ -10,7 +10,7 @@ use rumqttc::Transport;
 use rumqttc::tokio_rustls::rustls;
 use rumqttc::{
     AsyncClient, Broker, ConnectReturnCode, Event, Incoming, LastWill, MqttOptions, Publish,
-    PublishOptions, QoS, SubscribeReasonCode,
+    PublishOptions, QoS, SessionMode, SubscribeReasonCode,
 };
 use rustls_pki_types::{CertificateDer, PrivateKeyDer};
 use tokio::sync::{Mutex, OnceCell, broadcast, mpsc};
@@ -131,7 +131,16 @@ pub async fn run(conf: &Configuration, mut terminate_rx: broadcast::Receiver<()>
     };
 
     mqtt_opts.set_last_will(lwt_msg);
-    mqtt_opts.set_clean_start(conf.mqtt.clean_session);
+    if conf.mqtt.clean_session {
+        mqtt_opts.set_session_mode(SessionMode::Clean);
+    } else {
+        // With MQTT v5, clean_start=false alone does not persist the session: the session
+        // expiry interval must also be set (it defaults to 0). A new process has no session
+        // state to resume, so the first connection starts a new (persistent) session. Once
+        // connected, clean_start is disabled so that reconnects resume it.
+        mqtt_opts.set_session_mode(SessionMode::Persistent);
+        mqtt_opts.set_clean_start(true);
+    }
     mqtt_opts.set_keep_alive(conf.mqtt.keep_alive_interval.as_secs() as u16);
     if !conf.mqtt.username.is_empty() || !conf.mqtt.password.is_empty() {
         mqtt_opts.set_credentials(&conf.mqtt.username, conf.mqtt.password.clone());
@@ -249,6 +258,8 @@ pub async fn run(conf: &Configuration, mut terminate_rx: broadcast::Receiver<()>
         let on_mqtt_connection_error = conf.callbacks.on_mqtt_connection_error.clone();
         let reconnect_interval = conf.mqtt.reconnect_interval;
 
+        let clean_session = conf.mqtt.clean_session;
+
         async move {
             info!("Starting MQTT event loop");
 
@@ -269,6 +280,10 @@ pub async fn run(conf: &Configuration, mut terminate_rx: broadcast::Receiver<()>
                             }
                             Event::Incoming(Incoming::ConnAck(v)) => {
                                 if v.code == ConnectReturnCode::Success {
+                                    if !clean_session {
+                                        eventloop.options.set_clean_start(false);
+                                    }
+
                                     commands::exec_callback(&on_mqtt_connected).await;
 
                                     if let Err(e) = subscribe_tx.try_send(()) {
